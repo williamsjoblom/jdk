@@ -1,0 +1,1923 @@
+Buildfile: /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build.xml
+
+download:
+
+-taskdefs:
+
+-init-build-dir:
+
+-convert-old-project:
+
+-init:
+
+branding:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+release:
+
+-hide-excluded-modules:
+
+build:
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+Scanning for modules in /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/ide
+Scanning for modules in /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform
+Scanning for modules in suite /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 0 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.data
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 0 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.difference
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 0 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.layout
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 0 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.hierarchicallayout
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 0 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.selectioncoordinator
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.settings
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.connection
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.svg
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 0 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.util
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.coordinator
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 0 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.graph
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.bytecodes
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.filter
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.filterwindow
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.servercompiler
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.graal
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+[parseprojectxml] The module org.jdesktop.layout has been deprecated
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.controlflow
+
+taskdefs:
+
+-build-dir-init:
+
+-convert-old-project:
+
+common-init:
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+projectized-common.basic-init:
+
+basic-init:
+
+-release.dir:
+
+-release.files:
+
+files-init:
+
+nbm-license-init:
+
+build-init:
+
+-javac-init-nbjdk:
+
+-javac-init-bootclasspath-prepend:
+
+-javac-init-no-bootclasspath-prepend:
+
+-javac-init:
+
+init:
+
+up-to-date:
+
+compile:
+
+jar-prep:
+
+jar:
+
+netbeans-extra:
+
+javahelp:
+
+module-auto-deps:
+
+release:
+
+-init-startlevel:
+
+module-xml-regular:
+
+module-xml-autoload:
+
+module-xml-eager:
+
+-init-executables:
+
+chmod-executables:
+
+verify-class-linkage:
+
+-validate-layers:
+[xmlvalidate] 1 file(s) have been successfully validated.
+
+-verify-apichanges:
+
+-netbeans:
+
+netbeans:
+  [genlist] Generating Auto Update information for com.sun.hotspot.igv.view
+
+-jdk-pre-preinit:
+
+-jdk-preinit:
+
+-jdk-warn:
+
+-jdk-presetdef-basic:
+
+-jdk-default:
+
+-jdk-init:
+
+run:
+
+-init:
+
+-prepare-as-app:
+
+-prepare-as-platform:
+
+run:
+     [exec] -------------------------------------------------------------------------------
+     [exec] >Log Session: Wednesday, July 1, 2020 8:44:58 PM CEST
+     [exec] >System Info: 
+     [exec]   Product Version         = IdealGraphVisualizer 201403261440
+     [exec]   Operating System        = Linux version 5.4.0-7634-generic running on amd64
+     [exec]   Java; VM; Vendor        = 1.8.0_252; OpenJDK 64-Bit Server VM 25.252-b09; Private Build
+     [exec]   Runtime                 = OpenJDK Runtime Environment 1.8.0_252-8u252-b09-1ubuntu1-b09
+     [exec]   Java Home               = /usr/lib/jvm/java-8-openjdk-amd64/jre
+     [exec]   System Locale; Encoding = en_US (idealgraphvisualizer); UTF-8
+     [exec]   Home Directory          = /home/wax
+     [exec]   Current Directory       = /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer
+     [exec]   User Directory          = /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/testuserdir
+     [exec]   Cache Directory         = /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/testuserdir/var/cache
+     [exec]   Installation            = /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/cluster
+     [exec]                             /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/ide
+     [exec]                             /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform
+     [exec]                             /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform
+     [exec]   Boot & Ext. Classpath   = /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/resources.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/sunrsasign.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/jsse.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/jce.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/charsets.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/jfr.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/classes:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/icedtea-sound.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/nashorn.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/dnsns.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/zipfs.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/sunjce_provider.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/jaccess.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/sunec.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/cldrdata.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/java-atk-wrapper.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/localedata.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/ext/sunpkcs11.jar
+     [exec]   Application Classpath   = /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/boot.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/org-openide-modules.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/org-openide-util-lookup.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/org-openide-util.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/boot_ja.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/boot_pt_BR.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/boot_ru.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/boot_zh_CN.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-modules_ja.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-modules_pt_BR.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-modules_ru.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-modules_zh_CN.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util-lookup_ja.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util-lookup_pt_BR.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util-lookup_ru.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util-lookup_zh_CN.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util_ja.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util_pt_BR.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util_ru.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/lib/locale/org-openide-util_zh_CN.jar:/usr/lib/jvm/java-8-openjdk-amd64/lib/dt.jar:/usr/lib/jvm/java-8-openjdk-amd64/lib/tools.jar
+     [exec]   Startup Classpath       = /home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/org-openide-filesystems.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/core.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/org-openide-filesystems_zh_CN.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/org-openide-filesystems_ru.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/core_ru.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/org-openide-filesystems_pt_BR.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/core_pt_BR.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/org-openide-filesystems_ja.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/core_ja.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform/core/locale/core_zh_CN.jar:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/cluster/core/locale/core_idealgraphvisualizer.jar
+     [exec] -------------------------------------------------------------------------------
+     [exec] INFO [org.netbeans.modules.netbinox]: Install area set to file:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/
+     [exec] WARNING [org.netbeans.core.modules]: the modules [com.sun.hotspot.igv.bytecodes, com.sun.hotspot.igv.controlflow, com.sun.hotspot.igv.filter, com.sun.hotspot.igv.settings] use org.jdesktop.layout which is deprecated: Use javax.swing.GroupLayout instead. (In form editor: select Form ... in Inspector; change Layout Generation Style to Standard Java 6 code.)
+     [exec] WARNING [org.netbeans.core.modules]: the modules [org.netbeans.modules.xml.text] use org.netbeans.modules.editor.deprecated.pre65formatting which is deprecated.
+     [exec] WARNING [org.netbeans.core.modules]: the modules [org.netbeans.modules.ide.kit, org.netbeans.modules.xml.text] use org.netbeans.modules.editor.structure which is deprecated.
+     [exec] Gtk-Message: 20:44:59.660: Failed to load module "appmenu-gtk-module"
+     [exec] WARNING [org.netbeans.core.projects.cache]: Inefficient to include an empty layer in a module: jar:file:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/cluster/modules/com-sun-hotspot-igv-svg.jar!/com/sun/hotspot/igv/svg/layer.xml
+     [exec] WARNING [org.netbeans.core.projects.cache]: Inefficient to include an empty layer in a module: jar:file:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/cluster/modules/com-sun-hotspot-igv-connection.jar!/com/sun/hotspot/igv/connection/layer.xml
+     [exec] WARNING [org.netbeans.modules.autoupdate.ui.actions.AutoupdateSettings]: The property "netbeans.default_userdir_root" was not set!
+     [exec] INFO [org.netbeans.core.startup.NbEvents]: Turning on modules:
+     [exec] 	org.openide.util.lookup [8.22.1 201403261440]
+     [exec] 	org.openide.util [8.33.2 201403261440]
+     [exec] 	org.openide.modules [7.39.1 201403261440]
+     [exec] 	org.netbeans.api.annotations.common/1 [1.21.1 201403261440]
+     [exec] 	org.openide.filesystems [8.8.1 201403261440]
+     [exec] 	org.openide.awt [7.59.1 201403261440]
+     [exec] 	org.netbeans.api.progress/1 [1.35.1 201403261440]
+     [exec] 	org.openide.dialogs [7.32.1 201403261440]
+     [exec] 	org.openide.nodes [7.36.1 201403261440]
+     [exec] 	org.openide.windows [6.65.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.mimelookup/1 [1.33.1 201403261440]
+     [exec] 	org.openide.text [6.58.2 201403261440]
+     [exec] 	org.netbeans.swing.tabcontrol [1.46.1 201403261440]
+     [exec] 	org.netbeans.swing.outline [1.27.1 201403261440]
+     [exec] 	org.openide.explorer [6.54.1 201403261440]
+     [exec] 	org.openide.actions [6.32.1 201403261440]
+     [exec] 	org.netbeans.modules.queries/1 [1.36.1 201403261440]
+     [exec] 	org.openide.loaders [7.51.1 201403261440]
+     [exec] 	org.openide.io [1.42.1 201403261440]
+     [exec] 	org.openide.execution [1.33.1 201403261440]
+     [exec] 	org.netbeans.swing.plaf [1.34.1 201403261440]
+     [exec] 	org.netbeans.modules.projectapi/1 [1.54.2 201403261440]
+     [exec] 	org.netbeans.swing.dirchooser [1.22.1 201403261440]
+     [exec] 	org.netbeans.spi.tasklist/1 [1.27.1.1 1 201403261440]
+     [exec] 	org.netbeans.spi.quicksearch [1.20.1 201403261440]
+     [exec] 	org.netbeans.spi.palette/1 [1.38.1 201403261440]
+     [exec] 	org.netbeans.spi.navigator/1 [1.30.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.settings/1 [1.49.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.util/1 [1.55.1 201403261440]
+     [exec] 	org.netbeans.modules.lexer/2 [1.55.2.1 1 201403261440]
+     [exec] 	org.netbeans.modules.editor.lib2/1 [1.81.2.43 43 201403261440]
+     [exec] 	org.netbeans.modules.keyring [1.17.1 201403261440]
+     [exec] 	org.netbeans.bootstrap/1 [2.63.1 201403261440]
+     [exec] 	org.netbeans.core.startup/1 [1.51.1 201403261440]
+     [exec] 	org.netbeans.modules.sampler [1.7.1 201403261440]
+     [exec] 	org.netbeans.core/2 [3.43.1 201403261440]
+     [exec] 	org.netbeans.modules.options.api/1 [1.36.1 201403261440]
+     [exec] 	org.netbeans.modules.options.keymap [1.28.2 201403261440]
+     [exec] 	org.netbeans.modules.editor.settings.storage/1 [1.41.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.fold/1 [1.37.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.indent/2 [1.34.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.lib/3 [3.46.1.22.43 22 201403261440]
+     [exec] 	org.netbeans.spi.editor.hints/0 [1.32.1.7.43 7 201403261440]
+     [exec] 	org.netbeans.modules.projectuiapi/1 [1.72.1.8 8 201403261440]
+     [exec] 	org.netbeans.modules.editor.tools.storage [1.1.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.fold.nbui [1.4.1.43 201403261440]
+     [exec] 	org.netbeans.modules.editor/3 [1.75.2.5.22.43 5 201403261440]
+     [exec] 	org.netbeans.modules.options.editor/1 [1.45.1 201403261440]
+     [exec] 	org.netbeans.spi.editor.hints.projects [1.4.1.1.7 1 201403261440]
+     [exec] 	org.netbeans.core.multiview/1 [1.36.1 201403261440]
+     [exec] 	org.netbeans.api.xml/1 [1.36.1 201403261440]
+     [exec] 	org.netbeans.modules.xml.core/2 [1.36.1.4 4 201403261440]
+     [exec] 	org.netbeans.modules.xml.xam/1 [1.25.1.1 1 201403261440]
+     [exec] 	org.apache.xml.resolver [1.25.1.12 12 201403261440]
+     [exec] 	org.netbeans.modules.xml.retriever/1 [1.24.1 201403261440]
+     [exec] 	org.netbeans.modules.xml.schema.model/1 [1.25.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.xml.axi [1.24.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.bracesmatching/0 [1.31.1.43 201403261440]
+     [exec] 	org.netbeans.modules.editor.deprecated.pre65formatting/0 [1.20.1.1.5.22.43 1 201403261440]
+     [exec] 	org.netbeans.modules.editor.errorstripe.api/1 [2.26.1.1 1 201403261440]
+     [exec] 	org.netbeans.api.java.classpath/1 [1.39.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.errorstripe/2 [2.27.1.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.diff/1 [1.44.1.42.1 42 201403261440]
+     [exec] 	org.netbeans.modules.editor.guards/1 [1.23.1 201403261440]
+     [exec] 	org.netbeans.modules.project.indexingbridge [1.10.1 201403261440]
+     [exec] 	org.netbeans.modules.masterfs/2 [2.44.3 201403261440]
+     [exec] 	org.netbeans.libs.lucene/3 [3.13.1 201403261440]
+     [exec] 	org.netbeans.modules.parsing.lucene/2 [2.25.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.parsing.api/1 [1.69.1.8 8 201403261440]
+     [exec] 	org.netbeans.modules.refactoring.api [1.37.3.1 1 201403261440]
+     [exec] 	org.netbeans.modules.editor.completion/1 [1.36.1.2 2 201403261440]
+     [exec] 	org.netbeans.modules.editor.codetemplates/1 [1.35.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.editor.breadcrumbs/0 [1.9.1 201403261440]
+     [exec] 	org.netbeans.core.ui/1 [1.38.1 201403261440]
+     [exec] 	org.netbeans.api.search [1.14.1 201403261440]
+     [exec] 	org.netbeans.modules.jumpto/1 [1.39.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.editor.actions/1 [1.23.1.43 201403261440]
+     [exec] 	org.netbeans.modules.csl.api/2 [2.42.1.2.1.1.8 2 201403261440]
+     [exec] 	org.netbeans.modules.editor.structure/1 [1.40.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.xml.lexer [1.23.1 201403261440]
+     [exec] 	org.netbeans.modules.xml.text/2 [1.41.1 201403261440]
+     [exec] 	org.netbeans.modules.xml [1.24.1 201403261440]
+     [exec] 	org.netbeans.modules.servletapi/1 [1.33.1 201403261440]
+     [exec] 	org.netbeans.modules.httpserver/2 [2.29.1.42 42 201403261440]
+     [exec] 	org.netbeans.modules.xsl/1 [1.36.1 201403261440]
+     [exec] 	org.netbeans.modules.xml.xdm/1 [1.26.1.1 1 201403261440]
+     [exec] 	org.netbeans.libs.xerces/1 [1.32.1.281 281 201403261440]
+     [exec] 	org.netbeans.modules.xml.tax/2 [1.36.1.281 201403261440]
+     [exec] 	org.netbeans.modules.xml.tools/2 [1.36.1 201403261440]
+     [exec] 	org.netbeans.modules.xml.schema.completion [1.23.1 201403261440]
+     [exec] 	org.netbeans.modules.xml.catalog/2 [1.34.1.4 4 201403261440]
+     [exec] 	org.netbeans.api.debugger/1 [1.43.1 201403261440]
+     [exec] 	org.netbeans.libs.json_simple/1 [0.6.1 201403261440]
+     [exec] 	org.netbeans.modules.web.webkit.debugging [1.29.1 201403261440]
+     [exec] 	org.netbeans.modules.web.common [1.59.1 201403261440]
+     [exec] 	org.netbeans.modules.web.indent [1.12.1 201403261440]
+     [exec] 	org.netbeans.modules.extexecution/2 [1.39.1 201403261440]
+     [exec] 	org.netbeans.modules.extbrowser/1 [1.44.1 201403261440]
+     [exec] 	org.netbeans.modules.settings/1 [1.42.1 201403261440]
+     [exec] 	org.netbeans.core.windows/2 [2.66.1 201403261440]
+     [exec] 	org.netbeans.modules.web.browser.api [1.34.1 201403261440]
+     [exec] 	org.netbeans.modules.versioning.core/1 [1.17.3.1.42 1 201403261440]
+     [exec] 	org.netbeans.modules.versioning/1 [1.40.2.1 1 201403261440]
+     [exec] 	org.netbeans.modules.spellchecker.apimodule [1.18.1 201403261440]
+     [exec] 	org.netbeans.modules.versioning.util [1.50.2.42.1 201403261440]
+     [exec] 	org.netbeans.modules.versioning.ui/1 [1.13.1.42.1 201403261440]
+     [exec] 	org.netbeans.modules.autoupdate.services [1.42.2 201403261440]
+     [exec] 	org.netbeans.modules.autoupdate.ui [1.38.3 201403261440]
+     [exec] 	org.netbeans.modules.versioning.system.cvss.installer [1.9.1 201403261440]
+     [exec] 	org.netbeans.modules.versioning.masterfs [1.7.1 201403261440]
+     [exec] 	org.netbeans.modules.versioning.indexingbridge/0 [1.18.1 201403261440]
+     [exec] 	org.netbeans.modules.sendopts/2 [2.28.1 201403261440]
+     [exec] 	org.netbeans.modules.utilities/1 [1.51.1 201403261440]
+     [exec] 	org.netbeans.modules.utilities.project/1 [1.30.1 201403261440]
+     [exec] 	org.netbeans.modules.javahelp/1 [2.34.1 201403261440]
+     [exec] 	org.netbeans.modules.usersguide/1 [1.42.3 201403261440]
+     [exec] 	org.netbeans.lib.terminalemulator [1.29.1 201403261440]
+     [exec] 	org.netbeans.modules.terminal [1.16.2 201403261440]
+     [exec] 	org.netbeans.libs.swingx/1 [1.21.1 201403261440]
+     [exec] 	org.netbeans.modules.favorites/1 [1.36.1 201403261440]
+     [exec] 	org.netbeans.modules.team.commons [1.18.1 201403261440]
+     [exec] 	org.netbeans.modules.team.ide [1.1.1 201403261440]
+     [exec] 	org.netbeans.modules.tasklist.ui/1 [1.24.1.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.tasklist.todo/1 [1.24.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.tasklist.projectint/1 [1.22.1 201403261440]
+     [exec] 	org.netbeans.modules.tasklist.kit [1.22.1 201403261440]
+     [exec] 	org.netbeans.libs.ini4j/1 [1.24.1 201403261440]
+     [exec] 	org.netbeans.libs.svnClientAdapter/1 [1.32.1 201403261440]
+     [exec] 	org.netbeans.modules.subversion [1.32.2.42.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.plain.lib/1 [1.27.1 201403261440]
+     [exec] 	org.netbeans.modules.spellchecker [1.28.1.1.7 1 201403261440]
+     [exec] 	org.netbeans.modules.spellchecker.kit [1.19.1 201403261440]
+     [exec] 	org.netbeans.modules.spellchecker.dictionary_en [1.16.1 201403261440]
+     [exec] 	org.netbeans.modules.properties/1 [1.47.1 201403261440]
+     [exec] 	org.netbeans.modules.properties.syntax/1 [1.43.1 201403261440]
+     [exec] 	org.netbeans.modules.spellchecker.bindings.properties [1.15.1 201403261440]
+     [exec] 	org.netbeans.modules.html.lexer/1 [1.30.1 201403261440]
+     [exec] 	org.netbeans.modules.spellchecker.bindings.htmlxml [1.20.1 201403261440]
+     [exec] 	org.netbeans.core.execution/1 [1.34.1 201403261440]
+     [exec] 	org.netbeans.modules.projectui [1.47.1.8 201403261440]
+     [exec] 	org.netbeans.modules.project.libraries/1 [1.44.1 201403261440]
+     [exec] 	org.netbeans.modules.project.ant/1 [1.56.1 201403261440]
+     [exec] 	org.netbeans.modules.progress.ui [1.26.1 201403261440]
+     [exec] 	org.netbeans.modules.print.editor [7.20.1 201403261440]
+     [exec] 	org.netbeans.modules.print [7.19.1 201403261440]
+     [exec] 	org.netbeans.modules.parsing.ui [1.7.1 201403261440]
+     [exec] 	org.netbeans.core.ide/1 [1.34.1 201403261440]
+     [exec] 	org.netbeans.modules.notifications [1.1.1 201403261440]
+     [exec] 	org.netbeans.libs.osgi [1.15.1 201403261440]
+     [exec] 	org.netbeans.core.netigso [1.23.1 201403261440]
+     [exec] 	org.netbeans.modules.netbinox [1.32.1 201403261440]
+     [exec] 	org.eclipse.mylyn.commons.net [3.9.0 3.9.0.v20130612-0100]
+     [exec] 	org.eclipse.mylyn.tasks.core [3.9.0 3.9.0.v20130612-0100]
+     [exec] 	org.eclipse.core.jobs [3.5.101 3.5.101.v20120113-1953]
+     [exec] 	org.eclipse.mylyn.wikitext.core [1.8.0 1.8.0.v20130612-0100]
+     [exec] 	org.netbeans.modules.bugtracking [1.64.1 201403261440]
+     [exec] 	org.eclipse.equinox.common [3.6.0 3.6.0.v20110523]
+     [exec] 	org.eclipse.core.runtime [3.7.0 3.7.0.v20110110]
+     [exec] 	org.netbeans.modules.mylyn.util [1.16.2 201403261440]
+     [exec] 	org.netbeans.modules.mercurial [1.34.2.42.1 201403261440]
+     [exec] 	org.netbeans.libs.jna/1 [1.31.1 201403261440]
+     [exec] 	org.netbeans.modules.masterfs.linux [1.7.1 201403261440]
+     [exec] 	org.netbeans.modules.localhistory [1.27.1 201403261440]
+     [exec] 	org.netbeans.modules.lexer.nbbridge/1 [1.25.1.1 201403261440]
+     [exec] 	org.netbeans.libs.bytelist/1 [0.21.1.1 1 201403261440]
+     [exec] 	org.netbeans.libs.jvyamlb/1 [0.23.1 201403261440]
+     [exec] 	org.netbeans.modules.languages.yaml [2.25.1 201403261440]
+     [exec] 	org.netbeans.modules.languages.manifest [1.25.1 201403261440]
+     [exec] 	org.netbeans.modules.languages.diff [1.26.1 201403261440]
+     [exec] 	org.netbeans.modules.keyring.fallback [1.1.1 201403261440]
+     [exec] 	org.netbeans.modules.keyring.impl [1.14.1 201403261440]
+     [exec] 	org.netbeans.modules.html.editor.lib/3 [3.20.1 201403261440]
+     [exec] 	org.netbeans.libs.antlr3.runtime [1.15.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.css.lib/1 [1.67.2 201403261440]
+     [exec] 	org.netbeans.modules.css.model [1.24.1 201403261440]
+     [exec] 	org.netbeans.modules.css.editor/1 [1.57.2 201403261440]
+     [exec] 	org.netbeans.modules.html/1 [1.53.1 201403261440]
+     [exec] 	org.netbeans.modules.html.editor/2 [2.40.1 201403261440]
+     [exec] 	org.netbeans.libs.nashorn/1 [1.13.1 201403261440]
+     [exec] 	org.netbeans.modules.javascript2.editor/1 [0.29.3 201403261440]
+     [exec] 	org.netbeans.modules.javascript2.knockout [1.1.1 201403261440]
+     [exec] 	org.netbeans.modules.javascript2.extjs [1.1.2 201403261440]
+     [exec] 	org.netbeans.modules.javascript2.jquery [1.1.1 201403261440]
+     [exec] 	org.netbeans.modules.javascript2.kit/1 [0.6.1 201403261440]
+     [exec] 	org.netbeans.modules.image/1 [1.41.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.bookmarks/1 [1.30.1 201403261440]
+     [exec] 	org.netbeans.core.multitabs [1.3.3.1 1 201403261440]
+     [exec] 	com.jcraft.jsch [0.1.49 0.1.49]
+     [exec] 	org.netbeans.modules.dlight.nativeexecution [1.30.6.1 1 201403261440]
+     [exec] 	org.netbeans.modules.dlight.terminal [1.16.3.1 1 201403261440]
+     [exec] 	org.netbeans.core.multitabs.project [1.3.1.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.editor.search [1.15.1.0.43 0 201403261440]
+     [exec] 	org.apache.commons.logging [1.1.1 1.1.1]
+     [exec] 	org.netbeans.modules.html.parser/1 [1.26.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.html.validation/1 [1.23.1 201403261440]
+     [exec] 	org.netbeans.core.output2/1 [1.34.3 201403261440]
+     [exec] 	org.netbeans.modules.css.visual/3 [3.24.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.kit [1.26.1 201403261440]
+     [exec] 	org.netbeans.modules.autoupdate.cli [1.6.1 201403261440]
+     [exec] 	org.netbeans.libs.felix [2.9.1 201403261440]
+     [exec] 	org.netbeans.modules.core.kit [1.23.1 201403261440]
+     [exec] 	org.netbeans.modules.defaults/1 [1.25.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.macros/0 [1.24.1.1.22 1 201403261440]
+     [exec] 	org.netbeans.modules.editor.plain/2 [1.28.1 201403261440]
+     [exec] 	org.netbeans.modules.ide.kit [1.26.1 201403261440]
+     [exec] 	org.netbeans.modules.gsf.testrunner/1 [1.37.2 201403261440]
+     [exec] 	org.netbeans.libs.commons_net/2 [2.14.1.33 33 201403261440]
+     [exec] 	org.netbeans.modules.hudson [2.1.1 201403261440]
+     [exec] 	org.netbeans.modules.hudson.ui [1.1.1 201403261440]
+     [exec] 	org.netbeans.modules.hudson.tasklist [1.10.1 201403261440]
+     [exec] 	org.netbeans.modules.hudson.subversion [1.22.1 201403261440]
+     [exec] 	org.netbeans.modules.hudson.mercurial [1.22.1 201403261440]
+     [exec] 	org.netbeans.modules.hudson.git [1.11.1 201403261440]
+     [exec] 	org.netbeans.modules.html.knockout [1.3.1 201403261440]
+     [exec] 	org.netbeans.core.browser/1 [1.21.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.html.angular [1.4.2 201403261440]
+     [exec] 	org.eclipse.jgit [2.3.1 2.3.1.201302201838-r]
+     [exec] 	org.netbeans.libs.jna.platform/1 [1.1.1 201403261440]
+     [exec] 	org.netbeans.libs.jsch.agentproxy/1 [0.4.1 201403261440]
+     [exec] 	org.netbeans.libs.git/1 [1.12.1 201403261440]
+     [exec] 	org.netbeans.modules.git [1.11.2.1 201403261440]
+     [exec] 	org.apache.commons.io [1.4 1.4]
+     [exec] 	org.netbeans.modules.extexecution.impl [1.18.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.mimelookup.impl/1 [1.24.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.indent.project/0 [1.15.1 201403261440]
+     [exec] 	org.netbeans.modules.editor.global.format/1 [1.8.1.1 1 201403261440]
+     [exec] 	org.netbeans.modules.db.metadata.model/1 [1.4.2 201403261440]
+     [exec] 	org.netbeans.modules.db/1 [1.58.1.30 30 201403261440]
+     [exec] 	org.netbeans.modules.dbapi [1.27.1.30 201403261440]
+     [exec] 	org.netbeans.modules.derby [1.33.1 201403261440]
+     [exec] 	org.netbeans.api.visual [2.40.1 201403261440]
+     [exec] 	org.netbeans.modules.db.sql.visualeditor/1 [2.24.1.30 201403261440]
+     [exec] 	org.netbeans.modules.db.dataview [1.22.1 201403261440]
+     [exec] 	org.netbeans.modules.db.core [1.29.1 201403261440]
+     [exec] 	org.netbeans.modules.db.sql.editor [1.29.1.30 201403261440]
+     [exec] 	org.netbeans.modules.db.mysql [0.21.1.2 2 201403261440]
+     [exec] 	org.netbeans.modules.db.drivers [1.23.1 201403261440]
+     [exec] 	org.netbeans.modules.db.kit [1.24.1 201403261440]
+     [exec] 	org.netbeans.modules.css.prep [1.17.1 201403261440]
+     [exec] 	org.eclipse.mylyn.bugzilla.core [3.9.0 3.9.0.v20130612-0100]
+     [exec] 	org.apache.ws.commons.util [1.0.1 1.0.1]
+     [exec] 	org.apache.commons.httpclient [3.1.0 3.1.0]
+     [exec] 	org.netbeans.modules.bugzilla [1.42.1 201403261440]
+     [exec] 	org.netbeans.modules.bugtracking.bridge [1.32.1 201403261440]
+     [exec] 	org.netbeans.libs.svnClientAdapter.svnkit/1 [1.16.1 201403261440]
+     [exec] 	org.netbeans.libs.svnClientAdapter.javahl/1 [1.16.1 201403261440]
+     [exec] 	org.netbeans.libs.freemarker/1 [2.27.1.238 238 201403261440]
+     [exec] 	org.netbeans.core.network [1.1.2 201403261440]
+     [exec] 	org.netbeans.core.nativeaccess/1 [1.23.1 201403261440]
+     [exec] 	org.netbeans.core.io.ui/1 [1.23.1 201403261440]
+     [exec] 	org.netbeans.core.browser.webview/1 [1.8.1.1.1 1 201403261440]
+     [exec] 	org.jdesktop.layout/1 [1.27.1 201403261440]
+     [exec] 	org.eclipse.mylyn.commons.xmlrpc [3.9.0 3.9.0.v20130612-0100]
+     [exec] 	org.eclipse.mylyn.commons.repositories.core [1.1.0 1.1.0.v20130612-0100]
+     [exec] 	org.eclipse.mylyn.commons.core [3.9.0 3.9.0.v20130612-0100]
+     [exec] 	org.eclipse.equinox.security [1.1.1 1.1.1.R37x_v20110822-1018]
+     [exec] 	org.eclipse.equinox.registry [3.5.200 3.5.200.v20120522-1841]
+     [exec] 	org.eclipse.equinox.preferences [3.4.2 3.4.2.v20120111-2020]
+     [exec] 	org.eclipse.equinox.app [1.3.100 1.3.100.v20110321]
+     [exec] 	org.eclipse.core.runtime.compatibility.auth [3.2.200 3.2.200.v20110110]
+     [exec] 	org.eclipse.core.net [1.2.100 1.2.100.I20110511-0800]
+     [exec] 	org.eclipse.core.contenttype [3.4.100 3.4.100.v20110423-0524]
+     [exec] 	org.apache.xmlrpc [3.0.0 3.0.0]
+     [exec] 	org.apache.commons.lang [2.4.0 2.4.0]
+     [exec] 	org.apache.commons.codec [1.3.0 1.3.0]
+     [exec] 	com.sun.hotspot.igv.svg [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.layout [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.data [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.util [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.graph [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.filter [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.selectioncoordinator [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.settings [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.hierarchicallayout [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.difference [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.view [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.servercompiler [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.graal [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.filterwindow [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.connection [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.coordinator [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.controlflow [1.0 200629]
+     [exec] 	com.sun.hotspot.igv.bytecodes [1.0 200629]
+     [exec] 	com.jcraft.jzlib [1.0.7 1.0.7]
+     [exec] INFO [org.netbeans.core.netigso.Netigso]: bundle org.eclipse.mylyn.wikitext.textile.core@1.8.0.v20130612-0100 resolved
+     [exec] INFO [org.netbeans.core.netigso.Netigso]: bundle org.eclipse.mylyn.wikitext.confluence.core@1.8.0.v20130612-0100 resolved
+     [exec] INFO [org.netbeans.core.netigso.Netigso]: bundle org.eclipse.osgi@3.8.0.v20120529-1548 started
+     [exec] Cannot initialize GTK colors - using hardcoded defaults: java.lang.NoSuchMethodException: javax.swing.plaf.synth.SynthContext.getContext(java.lang.Class, javax.swing.JComponent, javax.swing.plaf.synth.Region, javax.swing.plaf.synth.SynthStyle, int)
+     [exec] INFO [org.netbeans.core.network.proxy.NetworkProxyReloader]: System network proxy resolver: Gnome
+     [exec] INFO [org.netbeans.core.network.proxy.gnome.GsettingsNetworkProxy]: GSettings system proxy resolver: direct connection
+     [exec] INFO [org.netbeans.core.network.proxy.NetworkProxyReloader]: System network proxy reloading succeeded.
+     [exec] INFO [org.netbeans.core.network.proxy.NetworkProxyReloader]: System network proxy - mode: direct
+     [exec] INFO [org.netbeans.core.network.proxy.NetworkProxyReloader]: System network proxy: falled to default (corect if direct mode went before)
+     [exec] INFO [org.netbeans.ui.metrics.laf]: USG_LOOK_AND_FEEL
+     [exec] Diagnostic information
+     [exec] Input arguments:
+     [exec] 	-Djdk.home=/usr/lib/jvm/java-8-openjdk-amd64
+     [exec] 	-Dnetbeans.running.environment=gnome
+     [exec] 	-Dnetbeans.dirs=/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/cluster:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/ide:/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform
+     [exec] 	-Dnetbeans.home=/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/nbplatform/platform
+     [exec] 	-Dnetbeans.logger.console=true
+     [exec] 	-ea
+     [exec] 	-da:org.openide.util.RequestProcessor
+     [exec] 	-Xms2g
+     [exec] 	-Xmx8g
+     [exec] 	-Djava.lang.Integer.IntegerCache.high=200000
+     [exec] 	-XX:+HeapDumpOnOutOfMemoryError
+     [exec] 	-XX:HeapDumpPath=/home/wax/workbench/jdk/src/utils/IdealGraphVisualizer/build/testuserdir/var/log/heapdump.hprof
+     [exec] Compiler: HotSpot 64-Bit Tiered Compilers
+     [exec] Heap memory usage: initial 2048.0MB maximum 7282.0MB
+     [exec] Non heap memory usage: initial 2.4MB maximum -1b
+     [exec] Garbage collector: PS Scavenge (Collections=2 Total time spent=0s)
+     [exec] Garbage collector: PS MarkSweep (Collections=2 Total time spent=0s)
+     [exec] Classes: loaded=6802 total loaded=6802 unloaded 0
+     [exec] INFO [org.netbeans.core.ui.warmup.DiagnosticTask]: Total memory 33,649,213,440
+     [exec] INFO [null]: Total physical memory 33,649,213,440
+     [exec] WARNING [org.openide.filesystems.Ordering]: Found same position 400 for both Menu/File/SeparatorNew.instance and Menu/File/com-sun-hotspot-igv-coordinator-actions-RemoveAction.shadow
+     [exec] WARNING [org.openide.filesystems.Ordering]: Found same position 150 for both Menu/View/com-sun-hotspot-igv-view-actions-NextDiagramAction.shadow and Menu/View/org-netbeans-core-multiview-SplitAction.instance
+     [exec] WARNING [org.openide.filesystems.Ordering]: Not all children in Menu/Window/ marked with the position attribute: [BytecodeViewAction.shadow, ControlFlowAction.shadow, FilterAction.shadow, OutlineAction.shadow], but some are: [org-netbeans-modules-navigator-ShowNavigatorAction.shadow, org-netbeans-core-io-ui-IOWindowAction.shadow, Separator3.instance, ConfigureWindow, org-netbeans-core-windows-actions-ResetWindowsAction.shadow, Separator4.instance, CloseWindowAction.shadow, CloseAllDocumentsAction.shadow, CloseAllButThisAction.shadow, DocumentsAction.shadow]
+     [exec] WARNING [org.netbeans.TopSecurityManager]: use of system property netbeans.home has been obsoleted in favor of InstalledFileLocator/Places at org.netbeans.Clusters.relativeDirsWithHome(Clusters.java:137)
+     [exec] Warning: validation was turned on but an org.xml.sax.ErrorHandler was not set, which is probably not what is desired.  Parser will use a default ErrorHandler to print the first 0  errors.  Please call the setErrorHandler method to fix this.
+     [exec] Error: URI=null Line=1: Document is invalid: no grammar found.
+     [exec] Error: URI=null Line=1: Document root element "graphDocument", must match DOCTYPE root "null".

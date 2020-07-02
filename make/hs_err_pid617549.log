@@ -1,0 +1,705 @@
+#
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x00007f6fef97a485, pid=617549, tid=617561
+#
+# JRE version: OpenJDK Runtime Environment (16.0) (fastdebug build 16-internal+0-adhoc.wax.jdk)
+# Java VM: OpenJDK 64-Bit Server VM (fastdebug 16-internal+0-adhoc.wax.jdk, mixed mode, tiered, compressed oops, g1 gc, linux-amd64)
+# Problematic frame:
+# V  [libjvm.so+0x14b6485]  polynomial_reduction_analyze(IdealLoopTree*)+0x7c5
+#
+# Core dump will be written. Default location: Core dumps may be processed with "/usr/share/apport/apport %p %s %c %d %P %E" (or dumping to /home/wax/workbench/jdk/make/core.617549)
+#
+# If you would like to submit a bug report, please visit:
+#   https://bugreport.java.com/bugreport/crash.jsp
+#
+
+---------------  S U M M A R Y ------------
+
+Command Line: -Dapplication.home=/home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk --add-modules=ALL-DEFAULT -Xms8m -Djlink.debug=true -Djdk.module.main=jdk.jlink jdk.jlink/jdk.tools.jlink.internal.Main --module-path /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/support/interim-jmods --endian little --output /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/support/interim-image --disable-plugin generate-jli-classes --add-modules java.base,java.logging
+
+Host: tesla, AMD Ryzen 9 3900X 12-Core Processor, 24 cores, 31G, Pop!_OS 20.04 LTS
+Time: Tue Jun 30 15:42:21 2020 CEST elapsed time: 0.142873 seconds (0d 0h 0m 0s)
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x00007f6fe82e0570):  JavaThread "C2 CompilerThread0" daemon [_thread_in_native, id=617561, stack(0x00007f6fb6c70000,0x00007f6fb6d71000)]
+
+
+Current CompileTask:
+C2:    142  102       4       java.lang.StringLatin1::hashCode (42 bytes)
+
+Stack: [0x00007f6fb6c70000,0x00007f6fb6d71000],  sp=0x00007f6fb6d6b680,  free space=1005k
+Native frames: (J=compiled Java code, A=aot compiled Java code, j=interpreted, Vv=VM code, C=native code)
+V  [libjvm.so+0x14b6485]  polynomial_reduction_analyze(IdealLoopTree*)+0x7c5
+V  [libjvm.so+0x11cf570]  PhaseIdealLoop::build_and_optimize(LoopOptsMode)+0xe20
+V  [libjvm.so+0x93b8c6]  PhaseIdealLoop::optimize(PhaseIterGVN&, LoopOptsMode)+0x326
+V  [libjvm.so+0x938e50]  Compile::Optimize()+0xd80
+V  [libjvm.so+0x93a9a3]  Compile::Compile(ciEnv*, ciMethod*, int, bool, bool, bool, DirectiveSet*)+0x15c3
+V  [libjvm.so+0x7868e9]  C2Compiler::compile_method(ciEnv*, ciMethod*, int, DirectiveSet*)+0x179
+V  [libjvm.so+0x948070]  CompileBroker::invoke_compiler_on_method(CompileTask*)+0xc00
+V  [libjvm.so+0x948c50]  CompileBroker::compiler_thread_loop()+0x620
+V  [libjvm.so+0x183ba9c]  JavaThread::thread_main_inner()+0x21c
+V  [libjvm.so+0x1841674]  Thread::call_run()+0x104
+V  [libjvm.so+0x14253ce]  thread_native_entry(Thread*)+0x11e
+
+
+siginfo: si_signo: 11 (SIGSEGV), si_code: 1 (SEGV_MAPERR), si_addr: 0x000000000000002a
+
+Register to memory mapping:
+
+RAX=0x0000000000000002 is an unknown value
+RBX=0x0 is NULL
+RCX=0x0 is NULL
+RDX=0x00000000000000e8 is an unknown value
+RSP=0x00007f6fb6d6b680 is pointing into the stack for thread: 0x00007f6fe82e0570
+RBP=0x00007f6fb6d6b740 is pointing into the stack for thread: 0x00007f6fe82e0570
+RSI=0x00007f6ff005d578: <offset 0x0000000001b99578> in /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so at 0x00007f6fee4c4000
+RDI=0x00007f6fe8000b80 points into unknown readable memory: 0x00007f6ff03a89f8 | f8 89 3a f0 6f 7f 00 00
+R8 =0x00000000000000d2 is an unknown value
+R9 =0x00007f6fb6d6ad60 is pointing into the stack for thread: 0x00007f6fe82e0570
+R10=0x0000000000000001 is an unknown value
+R11=0x0 is NULL
+R12=0x00007f6f900bd340 points into unknown readable memory: 0x00007f6ff0380420 | 20 04 38 f0 6f 7f 00 00
+R13=0x00007f6fb6d6b6d0 is pointing into the stack for thread: 0x00007f6fe82e0570
+R14=0x00007f6fe8000b80 points into unknown readable memory: 0x00007f6ff03a89f8 | f8 89 3a f0 6f 7f 00 00
+R15=0x00007f6fb6d6b6d0 is pointing into the stack for thread: 0x00007f6fe82e0570
+
+
+Registers:
+RAX=0x0000000000000002, RBX=0x0000000000000000, RCX=0x0000000000000000, RDX=0x00000000000000e8
+RSP=0x00007f6fb6d6b680, RBP=0x00007f6fb6d6b740, RSI=0x00007f6ff005d578, RDI=0x00007f6fe8000b80
+R8 =0x00000000000000d2, R9 =0x00007f6fb6d6ad60, R10=0x0000000000000001, R11=0x0000000000000000
+R12=0x00007f6f900bd340, R13=0x00007f6fb6d6b6d0, R14=0x00007f6fe8000b80, R15=0x00007f6fb6d6b6d0
+RIP=0x00007f6fef97a485, EFLAGS=0x0000000000010297, CSGSFS=0x002b000000000033, ERR=0x0000000000000004
+  TRAPNO=0x000000000000000e
+
+Top of Stack: (sp=0x00007f6fb6d6b680)
+0x00007f6fb6d6b680:   00007f6f90060fc0 00007f6fb6d6b6b0
+0x00007f6fb6d6b690:   00007f6ff03a9560 00007f6fb6d6b6d0
+0x00007f6fb6d6b6a0:   00007f6f00000000 00007f6fef66b46e
+0x00007f6fb6d6b6b0:   00007f6ff03a9560 00007f6fb6d6b6d0 
+
+Instructions: (pc=0x00007f6fef97a485)
+0x00007f6fef97a385:   fa ff ff 4c 8d 3d 59 ea a3 00 41 b8 01 00 00 00
+0x00007f6fef97a395:   48 8d 0d 95 96 56 00 48 8d 15 a1 96 56 00 be 73
+0x00007f6fef97a3a5:   01 00 00 48 8d 3d 61 07 57 00 49 8b 07 c6 00 58
+0x00007f6fef97a3b5:   44 8b 4b 1c 31 c0 e8 40 c8 4e ff e8 ab 3d f6 ff
+0x00007f6fef97a3c5:   48 8b 43 08 4c 8b 68 08 41 83 7d 18 01 0f 86 47
+0x00007f6fef97a3d5:   fc ff ff 83 7b 1c 01 0f 87 11 fb ff ff 49 8b 07
+0x00007f6fef97a3e5:   41 b8 01 00 00 00 48 8d 0d 3f 96 56 00 48 8d 15
+0x00007f6fef97a3f5:   4b 96 56 00 be 73 01 00 00 48 8d 3d 0b 07 57 00
+0x00007f6fef97a405:   c6 00 58 44 8b 4b 1c 31 c0 e8 ed c7 4e ff e8 58
+0x00007f6fef97a415:   3d f6 ff 48 8b 43 08 4c 8b 68 08 e9 ce fa ff ff
+0x00007f6fef97a425:   48 8d 05 b4 1a b1 00 48 8d 35 a7 5b 5e 00 48 8b
+0x00007f6fef97a435:   38 31 c0 e8 53 1d f8 ff 48 8d bd 50 ff ff ff 31
+0x00007f6fef97a445:   d2 4c 89 ee e8 f2 06 00 00 48 8d 85 70 ff ff ff
+0x00007f6fef97a455:   48 89 85 48 ff ff ff eb 38 66 90 49 8b 47 30 48
+0x00007f6fef97a465:   8b 44 18 18 44 8b 40 28 49 8b 47 30 41 8b 54 24
+0x00007f6fef97a475:   28 48 8d 35 fb 30 6e 00 4c 89 f7 48 8b 44 18 10
+0x00007f6fef97a485:   8b 48 28 31 c0 e8 01 1d f8 ff 83 85 60 ff ff ff
+0x00007f6fef97a495:   01 8b 55 a8 48 8b bd 48 ff ff ff 4c 89 ee e8 98
+0x00007f6fef97a4a5:   06 00 00 48 8b 85 78 ff ff ff 48 39 85 58 ff ff
+0x00007f6fef97a4b5:   ff 74 33 48 8d 05 29 e9 a3 00 48 8d 0d 42 f5 57
+0x00007f6fef97a4c5:   00 48 8d 15 63 f5 57 00 be 25 02 00 00 48 8d 3d
+0x00007f6fef97a4d5:   97 98 57 00 48 8b 00 c6 00 58 31 c0 e8 1a c7 4e
+0x00007f6fef97a4e5:   ff e8 85 3c f6 ff 8b 85 60 ff ff ff 3b 45 80 0f
+0x00007f6fef97a4f5:   84 fc fa ff ff 48 8d 35 df 19 b1 00 48 63 d8 4c
+0x00007f6fef97a505:   8b bd 58 ff ff ff 48 c1 e3 05 4c 8b 36 85 c0 78
+0x00007f6fef97a515:   0a 41 3b 47 18 0f 8c 40 ff ff ff 4c 8d 1d c1 e8
+0x00007f6fef97a525:   a3 00 48 8d 0d 44 dd 57 00 48 8d 15 23 f5 57 00
+0x00007f6fef97a535:   be ec 00 00 00 48 8d 3d 2f 98 57 00 49 8b 03 c6
+0x00007f6fef97a545:   00 58 31 c0 e8 b2 c6 4e ff e8 1d 3c f6 ff 49 8b
+0x00007f6fef97a555:   47 30 4c 8d 1d 8a e8 a3 00 4c 8b bd 58 ff ff ff
+0x00007f6fef97a565:   48 8b 44 18 18 44 8b 40 28 8b 85 60 ff ff ff 48
+0x00007f6fef97a575:   63 d8 48 c1 e3 05 85 c0 78 0a 41 3b 47 18 0f 8c 
+
+
+Stack slot to memory mapping:
+stack at sp + 0 slots: 0x00007f6f90060fc0 points into unknown readable memory: 0x00007f6ff03a0de0 | e0 0d 3a f0 6f 7f 00 00
+stack at sp + 1 slots: 0x00007f6fb6d6b6b0 is pointing into the stack for thread: 0x00007f6fe82e0570
+stack at sp + 2 slots: 0x00007f6ff03a9560: <offset 0x0000000001ee5560> in /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so at 0x00007f6fee4c4000
+stack at sp + 3 slots: 0x00007f6fb6d6b6d0 is pointing into the stack for thread: 0x00007f6fe82e0570
+stack at sp + 4 slots: 0x00007f6f00000000 is an unknown value
+stack at sp + 5 slots: 0x00007f6fef66b46e: <offset 0x00000000011a746e> in /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so at 0x00007f6fee4c4000
+stack at sp + 6 slots: 0x00007f6ff03a9560: <offset 0x0000000001ee5560> in /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so at 0x00007f6fee4c4000
+stack at sp + 7 slots: 0x00007f6fb6d6b6d0 is pointing into the stack for thread: 0x00007f6fe82e0570
+
+
+---------------  P R O C E S S  ---------------
+
+uid  : 1000 euid : 1000 gid  : 1000 egid : 1000
+
+umask: 0002 (-------w-)
+
+Threads class SMR info:
+_java_thread_list=0x00007f6f94076130, length=12, elements={
+0x00007f6fe80321f0, 0x00007f6fe8292620, 0x00007f6fe8294540, 0x00007f6fe82dc540,
+0x00007f6fe82de1b0, 0x00007f6fe82e0570, 0x00007f6fe82e2330, 0x00007f6fe82f2ea0,
+0x00007f6fe83614c0, 0x00007f6f900a2400, 0x00007f6f94071eb0, 0x00007f6f94074960
+}
+_java_thread_list_alloc_cnt=13, _java_thread_list_free_cnt=11, _java_thread_list_max=12, _nested_thread_list_max=0
+_tlh_cnt=43, _tlh_times=0, avg_tlh_time=0.00, _tlh_time_max=0
+_delete_lock_wait_cnt=0, _delete_lock_wait_max=0
+_to_delete_list_cnt=0, _to_delete_list_max=1
+
+Java Threads: ( => current thread )
+  0x00007f6fe80321f0 JavaThread "main" [_thread_in_Java, id=617550, stack(0x00007f6fee274000,0x00007f6fee375000)]
+  0x00007f6fe8292620 JavaThread "Reference Handler" daemon [_thread_blocked, id=617557, stack(0x00007f6fb7074000,0x00007f6fb7175000)]
+  0x00007f6fe8294540 JavaThread "Finalizer" daemon [_thread_blocked, id=617558, stack(0x00007f6fb6f73000,0x00007f6fb7074000)]
+  0x00007f6fe82dc540 JavaThread "Signal Dispatcher" daemon [_thread_blocked, id=617559, stack(0x00007f6fb6e72000,0x00007f6fb6f73000)]
+  0x00007f6fe82de1b0 JavaThread "Service Thread" daemon [_thread_blocked, id=617560, stack(0x00007f6fb6d71000,0x00007f6fb6e72000)]
+=>0x00007f6fe82e0570 JavaThread "C2 CompilerThread0" daemon [_thread_in_native, id=617561, stack(0x00007f6fb6c70000,0x00007f6fb6d71000)]
+  0x00007f6fe82e2330 JavaThread "C1 CompilerThread0" daemon [_thread_in_native, id=617562, stack(0x00007f6fb6b6f000,0x00007f6fb6c70000)]
+  0x00007f6fe82f2ea0 JavaThread "Sweeper thread" daemon [_thread_blocked, id=617563, stack(0x00007f6fb6a6e000,0x00007f6fb6b6f000)]
+  0x00007f6fe83614c0 JavaThread "Common-Cleaner" daemon [_thread_blocked, id=617564, stack(0x00007f6fb693c000,0x00007f6fb6a3d000)]
+  0x00007f6f900a2400 JavaThread "C1 CompilerThread1" daemon [_thread_in_native, id=617565, stack(0x00007f6fb683b000,0x00007f6fb693c000)]
+  0x00007f6f94071eb0 JavaThread "C1 CompilerThread2" daemon [_thread_in_native, id=617566, stack(0x00007f6fb673a000,0x00007f6fb683b000)]
+  0x00007f6f94074960 JavaThread "C1 CompilerThread3" daemon [_thread_in_native, id=617567, stack(0x00007f6fb6639000,0x00007f6fb673a000)]
+
+Other Threads:
+  0x00007f6fe8254ba0 VMThread "VM Thread" [stack: 0x00007f6fb7177000,0x00007f6fb7277000] [id=617556]
+  0x00007f6fe80747e0 GCTaskThread "GC Thread#0" [stack: 0x00007f6fecbf2000,0x00007f6feccf2000] [id=617551]
+  0x00007f6fe8086340 ConcurrentGCThread "G1 Main Marker" [stack: 0x00007f6fecaf0000,0x00007f6fecbf0000] [id=617552]
+  0x00007f6fe8087b00 ConcurrentGCThread "G1 Conc#0" [stack: 0x00007f6fec9ee000,0x00007f6fecaee000] [id=617553]
+  0x00007f6fe80d9d40 ConcurrentGCThread "G1 Refine#0" [stack: 0x00007f6fb7bfd000,0x00007f6fb7cfd000] [id=617554]
+  0x00007f6fe80db3e0 ConcurrentGCThread "G1 Young RemSet Sampling" [stack: 0x00007f6fb7afb000,0x00007f6fb7bfb000] [id=617555]
+
+Threads with active compile tasks:
+C2 CompilerThread0      146  102       4       java.lang.StringLatin1::hashCode (42 bytes)
+C1 CompilerThread0      146  124       3       jdk.internal.org.objectweb.asm.Frame::execute (2305 bytes)
+C1 CompilerThread1      146  160       3       java.util.HashMap$HashIterator::<init> (79 bytes)
+C1 CompilerThread2      146  155       3       java.util.AbstractCollection::addAll (42 bytes)
+C1 CompilerThread3      146  153       3       java.util.HashMap::getNode (150 bytes)
+
+VM state: not at safepoint (normal execution)
+
+VM Mutex/Monitor currently owned by a thread:  ([mutex/lock_event])
+[0x00007f6fe802adc0] CodeCache_lock - owner thread: 0x00007f6f94071eb0
+[0x00007f6fe802e2e0] Compile_lock - owner thread: 0x00007f6f94071eb0
+[0x00007f6fe802e610] MethodCompileQueue_lock - owner thread: 0x00007f6f94071eb0
+
+Heap address: 0x000000060a800000, size: 8024 MB, Compressed Oops mode: Zero based, Oop shift amount: 3
+CDS disabled.
+Compressed class space mapped at: 0x0000000800000000-0x0000000840000000, size: 1073741824
+Narrow klass base: 0x0000000800000000, Narrow klass shift: 0, Narrow klass range: 0x40000000
+
+GC Precious Log:
+ CPUs: 24 total, 24 available
+ Memory: 32090M
+ Large Page Support: Disabled
+ NUMA Support: Disabled
+ Compressed Oops: Enabled (Zero based)
+ Heap Region Size: 4M
+ Heap Min Capacity: 8M
+ Heap Initial Capacity: 8M
+ Heap Max Capacity: 8024M
+ Pre-touch: Disabled
+ Parallel Workers: 18
+ Concurrent Workers: 5
+ Concurrent Refinement Workers: 18
+ Periodic GC: Disabled
+
+Heap:
+ garbage-first heap   total 8192K, used 0K [0x000000060a800000, 0x0000000800000000)
+  region size 4096K, 1 young (4096K), 0 survivors (0K)
+ Metaspace       used 5780K, capacity 5824K, committed 5888K, reserved 1056768K
+  class space    used 499K, capacity 512K, committed 512K, reserved 1048576K
+
+Heap Regions: E=young(eden), S=young(survivor), O=old, HS=humongous(starts), HC=humongous(continues), CS=collection set, F=free, OA=open archive, CA=closed archive, TAMS=top-at-mark-start (previous, next)
+|   0|0x000000060a800000, 0x000000060a800000, 0x000000060ac00000|  0%| F|  |TAMS 0x000000060a800000, 0x000000060a800000| Untracked 
+|   1|0x000000060ac00000, 0x000000060ada0778, 0x000000060b000000| 40%| E|  |TAMS 0x000000060ac00000, 0x000000060ac00000| Complete 
+
+Card table byte_map: [0x00007f6fd70a8000,0x00007f6fd8054000] _byte_map_base: 0x00007f6fd4054000
+
+Marking Bits (Prev, Next): (CMBitMap*) 0x00007f6fe8075958, (CMBitMap*) 0x00007f6fe8075998
+ Prev Bits: [0x00007f6fce39c000, 0x00007f6fd60fc000)
+ Next Bits: [0x00007f6fc663c000, 0x00007f6fce39c000)
+
+Polling page: 0x00007f6fee272000
+
+Metaspace:
+
+Usage:
+  Non-class:      5.19 MB capacity,     5.16 MB (>99%) used,    25.91 KB ( <1%) free+waste,     4.44 KB ( <1%) overhead. 
+      Class:    512.00 KB capacity,   499.22 KB ( 98%) used,    10.78 KB (  2%) free+waste,     2.00 KB ( <1%) overhead. 
+       Both:      5.69 MB capacity,     5.65 MB (>99%) used,    36.69 KB ( <1%) free+waste,     6.44 KB ( <1%) overhead. 
+
+Virtual space:
+  Non-class space:        8.00 MB reserved,       5.25 MB ( 66%) committed 
+      Class space:        1.00 GB reserved,     512.00 KB ( <1%) committed 
+             Both:        1.01 GB reserved,       5.75 MB ( <1%) committed 
+
+Chunk freelists:
+   Non-Class:  32.00 KB
+       Class:  0 bytes
+        Both:  32.00 KB
+
+MaxMetaspaceSize: 17179869184.00 GB
+CompressedClassSpaceSize: 1.00 GB
+
+CodeHeap 'non-profiled nmethods': size=119168Kb used=37Kb max_used=37Kb free=119130Kb
+ bounds [0x00007f6fe0ba0000, 0x00007f6fe0e10000, 0x00007f6fe8000000]
+CodeHeap 'profiled nmethods': size=119164Kb used=268Kb max_used=268Kb free=118895Kb
+ bounds [0x00007f6fd9741000, 0x00007f6fd99b1000, 0x00007f6fe0ba0000]
+CodeHeap 'non-nmethods': size=7428Kb used=3505Kb max_used=3505Kb free=3922Kb
+ bounds [0x00007f6fd9000000, 0x00007f6fd9370000, 0x00007f6fd9741000]
+ total_blobs=1043 nmethods=151 adapters=811
+ compilation: enabled
+              stopped_count=0, restarted_count=0
+ full_count=0
+
+Compilation events (20 events):
+Event: 0.119 Thread 0x00007f6f94071eb0   62       3       java.lang.String::checkBoundsBeginEnd (63 bytes)
+Event: 0.119 Thread 0x00007f6f900a2400 nmethod 98 0x00007f6fd9762d90 code [0x00007f6fd9762f60, 0x00007f6fd97630e8]
+Event: 0.119 Thread 0x00007f6f900a2400   95       1       sun.nio.fs.NativeBuffer::address (5 bytes)
+Event: 0.119 Thread 0x00007f6fe82e0570  102       4       java.lang.StringLatin1::hashCode (42 bytes)
+Event: 0.119 Thread 0x00007f6f900a2400 nmethod 95 0x00007f6fe0ba5190 code [0x00007f6fe0ba5340, 0x00007f6fe0ba5418]
+Event: 0.119 Thread 0x00007f6f900a2400   84       3       java.lang.String::getBytes (44 bytes)
+Event: 0.120 Thread 0x00007f6f900a2400 nmethod 84 0x00007f6fd9763210 code [0x00007f6fd9763440, 0x00007f6fd97637d8]
+Event: 0.120 Thread 0x00007f6f900a2400  100       3       java.lang.AbstractStringBuilder::newCapacity (59 bytes)
+Event: 0.121 Thread 0x00007f6f94074960 nmethod 61 0x00007f6fd9763a10 code [0x00007f6fd9763c60, 0x00007f6fd9764168]
+Event: 0.121 Thread 0x00007f6f94074960   50       1       java.lang.invoke.MemberName::getDeclaringClass (5 bytes)
+Event: 0.121 Thread 0x00007f6f94074960 nmethod 50 0x00007f6fe0ba5490 code [0x00007f6fe0ba5640, 0x00007f6fe0ba5738]
+Event: 0.121 Thread 0x00007f6f94074960  101       3       jdk.internal.util.ArraysSupport::newLength (23 bytes)
+Event: 0.121 Thread 0x00007f6fe82e2330 nmethod 96 0x00007f6fd9764510 code [0x00007f6fd9764c20, 0x00007f6fd9767088]
+Event: 0.121 Thread 0x00007f6fe82e2330   59       1       sun.invoke.util.Wrapper::basicTypeChar (5 bytes)
+Event: 0.121 Thread 0x00007f6fe82e2330 nmethod 59 0x00007f6fe0ba5810 code [0x00007f6fe0ba59c0, 0x00007f6fe0ba5a98]
+Event: 0.121 Thread 0x00007f6fe82e2330  103       3       jdk.internal.org.objectweb.asm.ByteVector::put12 (64 bytes)
+Event: 0.122 Thread 0x00007f6f94071eb0 nmethod 62 0x00007f6fd9768790 code [0x00007f6fd9768a60, 0x00007f6fd9769398]
+Event: 0.122 Thread 0x00007f6fe82e2330 nmethod 103 0x00007f6fd9769a10 code [0x00007f6fd9769c40, 0x00007f6fd9769f48]
+Event: 0.122 Thread 0x00007f6f900a2400 nmethod 100 0x00007f6fd976a190 code [0x00007f6fd976a3c0, 0x00007f6fd976a958]
+Event: 0.122 Thread 0x00007f6f94074960 nmethod 101 0x00007f6fd976ad10 code [0x00007f6fd976aee0, 0x00007f6fd976b288]
+
+GC Heap History (0 events):
+No events
+
+Deoptimization events (0 events):
+No events
+
+Classes unloaded (0 events):
+No events
+
+Classes redefined (0 events):
+No events
+
+Internal exceptions (8 events):
+Event: 0.087 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac4aae8}: 'java.lang.Object java.lang.invoke.DirectMethodHandle$Holder.invokeStatic(java.lang.Object, java.lang.Object, java.lang.Object)'> (0x000000060ac4aae8) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+Event: 0.089 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac542f8}: 'java.lang.Object java.lang.invoke.Invokers$Holder.invokeExact_MT(java.lang.Object, java.lang.Object, java.lang.Object, java.lang.Object, java.lang.Object, java.lang.Object, java.lang.Object, java.lang.Object)'> (0x000000060ac542f8) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+Event: 0.093 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac5eb08}: 'java.lang.Object java.lang.invoke.DirectMethodHandle$Holder.newInvokeSpecial(java.lang.Object, java.lang.Object, java.lang.Object)'> (0x000000060ac5eb08) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+Event: 0.094 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac661c0}: 'java.lang.Object java.lang.invoke.Invokers$Holder.linkToTargetMethod(java.lang.Object, java.lang.Object, java.lang.Object)'> (0x000000060ac661c0) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+Event: 0.100 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac84120}: 'java.lang.Object java.lang.invoke.DirectMethodHandle$Holder.invokeSpecial(java.lang.Object, java.lang.Object, java.lang.Object)'> (0x000000060ac84120) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+Event: 0.105 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac908c0}: 'java.lang.Object java.lang.invoke.DirectMethodHandle$Holder.invokeStatic(java.lang.Object, java.lang.Object)'> (0x000000060ac908c0) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+Event: 0.106 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac97090}: 'java.lang.Object java.lang.invoke.DirectMethodHandle$Holder.newInvokeSpecial(java.lang.Object, java.lang.Object)'> (0x000000060ac97090) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+Event: 0.107 Thread 0x00007f6fe80321f0 Exception <a 'java/lang/NoSuchMethodError'{0x000000060ac9adf8}: 'java.lang.Object java.lang.invoke.Invokers$Holder.linkToTargetMethod(java.lang.Object, java.lang.Object)'> (0x000000060ac9adf8) 
+thrown [/home/wax/workbench/jdk/src/hotspot/share/interpreter/linkResolver.cpp, line 781]
+
+Events (20 events):
+Event: 0.121 loading class java/util/Spliterators$EmptySpliterator$OfRef done
+Event: 0.121 loading class java/util/Spliterators$EmptySpliterator$OfInt
+Event: 0.121 loading class java/util/Spliterator$OfInt
+Event: 0.121 loading class java/util/Spliterator$OfPrimitive
+Event: 0.121 loading class java/util/Spliterator$OfPrimitive done
+Event: 0.121 loading class java/util/Spliterator$OfInt done
+Event: 0.122 loading class java/util/Spliterators$EmptySpliterator$OfInt done
+Event: 0.122 loading class java/util/Spliterators$EmptySpliterator$OfLong
+Event: 0.122 loading class java/util/Spliterator$OfLong
+Event: 0.122 loading class java/util/Spliterator$OfLong done
+Event: 0.122 loading class java/util/Spliterators$EmptySpliterator$OfLong done
+Event: 0.122 loading class java/util/Spliterators$EmptySpliterator$OfDouble
+Event: 0.122 loading class java/util/Spliterator$OfDouble
+Event: 0.122 loading class java/util/Spliterator$OfDouble done
+Event: 0.122 loading class java/util/Spliterators$EmptySpliterator$OfDouble done
+Event: 0.122 loading class java/util/Spliterators$IteratorSpliterator
+Event: 0.122 loading class java/util/Spliterators$IteratorSpliterator done
+Event: 0.122 loading class java/util/stream/StreamSupport
+Event: 0.122 loading class java/util/stream/StreamSupport done
+Event: 0.122 loading class java/util/stream/ReferencePipeline$Head
+
+
+Dynamic libraries:
+60a800000-60b000000 rw-p 00000000 00:00 0 
+60b000000-800000000 ---p 00000000 00:00 0 
+800000000-800080000 rw-p 00000000 00:00 0 
+800080000-840000000 ---p 00000000 00:00 0 
+556c8f716000-556c8f717000 r--p 00000000 fd:01 20324267                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/bin/jlink
+556c8f717000-556c8f718000 r-xp 00001000 fd:01 20324267                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/bin/jlink
+556c8f718000-556c8f719000 r--p 00002000 fd:01 20324267                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/bin/jlink
+556c8f719000-556c8f71a000 r--p 00002000 fd:01 20324267                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/bin/jlink
+556c8f71a000-556c8f71b000 rw-p 00003000 fd:01 20324267                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/bin/jlink
+556c915a3000-556c915c4000 rw-p 00000000 00:00 0                          [heap]
+7f6f78000000-7f6f78068000 rw-p 00000000 00:00 0 
+7f6f78068000-7f6f7c000000 ---p 00000000 00:00 0 
+7f6f80000000-7f6f80078000 rw-p 00000000 00:00 0 
+7f6f80078000-7f6f84000000 ---p 00000000 00:00 0 
+7f6f84000000-7f6f84086000 rw-p 00000000 00:00 0 
+7f6f84086000-7f6f88000000 ---p 00000000 00:00 0 
+7f6f88000000-7f6f88021000 rw-p 00000000 00:00 0 
+7f6f88021000-7f6f8c000000 ---p 00000000 00:00 0 
+7f6f8c000000-7f6f8c021000 rw-p 00000000 00:00 0 
+7f6f8c021000-7f6f90000000 ---p 00000000 00:00 0 
+7f6f90000000-7f6f900d5000 rw-p 00000000 00:00 0 
+7f6f900d5000-7f6f94000000 ---p 00000000 00:00 0 
+7f6f94000000-7f6f94165000 rw-p 00000000 00:00 0 
+7f6f94165000-7f6f98000000 ---p 00000000 00:00 0 
+7f6f98000000-7f6f98021000 rw-p 00000000 00:00 0 
+7f6f98021000-7f6f9c000000 ---p 00000000 00:00 0 
+7f6f9c000000-7f6f9c021000 rw-p 00000000 00:00 0 
+7f6f9c021000-7f6fa0000000 ---p 00000000 00:00 0 
+7f6fa0000000-7f6fa0021000 rw-p 00000000 00:00 0 
+7f6fa0021000-7f6fa4000000 ---p 00000000 00:00 0 
+7f6fa4000000-7f6fa4021000 rw-p 00000000 00:00 0 
+7f6fa4021000-7f6fa8000000 ---p 00000000 00:00 0 
+7f6fa8000000-7f6fa8021000 rw-p 00000000 00:00 0 
+7f6fa8021000-7f6fac000000 ---p 00000000 00:00 0 
+7f6fac000000-7f6fac021000 rw-p 00000000 00:00 0 
+7f6fac021000-7f6fb0000000 ---p 00000000 00:00 0 
+7f6fb0000000-7f6fb0021000 rw-p 00000000 00:00 0 
+7f6fb0021000-7f6fb4000000 ---p 00000000 00:00 0 
+7f6fb61c9000-7f6fb6639000 rw-p 00000000 00:00 0 
+7f6fb6639000-7f6fb663d000 ---p 00000000 00:00 0 
+7f6fb663d000-7f6fb673a000 rw-p 00000000 00:00 0 
+7f6fb673a000-7f6fb673e000 ---p 00000000 00:00 0 
+7f6fb673e000-7f6fb683b000 rw-p 00000000 00:00 0 
+7f6fb683b000-7f6fb683f000 ---p 00000000 00:00 0 
+7f6fb683f000-7f6fb693c000 rw-p 00000000 00:00 0 
+7f6fb693c000-7f6fb6940000 ---p 00000000 00:00 0 
+7f6fb6940000-7f6fb6a6e000 rw-p 00000000 00:00 0 
+7f6fb6a6e000-7f6fb6a72000 ---p 00000000 00:00 0 
+7f6fb6a72000-7f6fb6b6f000 rw-p 00000000 00:00 0 
+7f6fb6b6f000-7f6fb6b73000 ---p 00000000 00:00 0 
+7f6fb6b73000-7f6fb6c70000 rw-p 00000000 00:00 0 
+7f6fb6c70000-7f6fb6c74000 ---p 00000000 00:00 0 
+7f6fb6c74000-7f6fb6d71000 rw-p 00000000 00:00 0 
+7f6fb6d71000-7f6fb6d75000 ---p 00000000 00:00 0 
+7f6fb6d75000-7f6fb6e72000 rw-p 00000000 00:00 0 
+7f6fb6e72000-7f6fb6e76000 ---p 00000000 00:00 0 
+7f6fb6e76000-7f6fb6f73000 rw-p 00000000 00:00 0 
+7f6fb6f73000-7f6fb6f77000 ---p 00000000 00:00 0 
+7f6fb6f77000-7f6fb7074000 rw-p 00000000 00:00 0 
+7f6fb7074000-7f6fb7078000 ---p 00000000 00:00 0 
+7f6fb7078000-7f6fb7175000 rw-p 00000000 00:00 0 
+7f6fb7175000-7f6fb7176000 ---p 00000000 00:00 0 
+7f6fb7176000-7f6fb7838000 rw-p 00000000 00:00 0 
+7f6fb7838000-7f6fb7af8000 ---p 00000000 00:00 0 
+7f6fb7af9000-7f6fb7afa000 ---p 00000000 00:00 0 
+7f6fb7afa000-7f6fb7bfb000 rw-p 00000000 00:00 0 
+7f6fb7bfb000-7f6fb7bfc000 ---p 00000000 00:00 0 
+7f6fb7bfc000-7f6fb8000000 rw-p 00000000 00:00 0 
+7f6fb8000000-7f6fb8021000 rw-p 00000000 00:00 0 
+7f6fb8021000-7f6fbc000000 ---p 00000000 00:00 0 
+7f6fbc000000-7f6fbc021000 rw-p 00000000 00:00 0 
+7f6fbc021000-7f6fc0000000 ---p 00000000 00:00 0 
+7f6fc0000000-7f6fc0021000 rw-p 00000000 00:00 0 
+7f6fc0021000-7f6fc4000000 ---p 00000000 00:00 0 
+7f6fc4009000-7f6fc400d000 r--p 00000000 fd:01 15342232                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnet.so
+7f6fc400d000-7f6fc401c000 r-xp 00004000 fd:01 15342232                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnet.so
+7f6fc401c000-7f6fc4020000 r--p 00013000 fd:01 15342232                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnet.so
+7f6fc4020000-7f6fc4021000 r--p 00016000 fd:01 15342232                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnet.so
+7f6fc4021000-7f6fc4022000 rw-p 00017000 fd:01 15342232                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnet.so
+7f6fc4022000-7f6fc4028000 r--p 00000000 fd:01 15342234                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnio.so
+7f6fc4028000-7f6fc4030000 r-xp 00006000 fd:01 15342234                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnio.so
+7f6fc4030000-7f6fc4033000 r--p 0000e000 fd:01 15342234                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnio.so
+7f6fc4033000-7f6fc4034000 ---p 00011000 fd:01 15342234                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnio.so
+7f6fc4034000-7f6fc4035000 r--p 00011000 fd:01 15342234                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnio.so
+7f6fc4035000-7f6fc4036000 rw-p 00012000 fd:01 15342234                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libnio.so
+7f6fc4036000-7f6fc665c000 rw-p 00000000 00:00 0 
+7f6fc665c000-7f6fce39c000 ---p 00000000 00:00 0 
+7f6fce39c000-7f6fce3bc000 rw-p 00000000 00:00 0 
+7f6fce3bc000-7f6fd60fc000 ---p 00000000 00:00 0 
+7f6fd60fc000-7f6fd6100000 rw-p 00000000 00:00 0 
+7f6fd6100000-7f6fd70a8000 ---p 00000000 00:00 0 
+7f6fd70a8000-7f6fd70ac000 rw-p 00000000 00:00 0 
+7f6fd70ac000-7f6fd8054000 ---p 00000000 00:00 0 
+7f6fd8054000-7f6fd8058000 rw-p 00000000 00:00 0 
+7f6fd8058000-7f6fd9000000 ---p 00000000 00:00 0 
+7f6fd9000000-7f6fd9370000 rwxp 00000000 00:00 0 
+7f6fd9370000-7f6fd9741000 ---p 00000000 00:00 0 
+7f6fd9741000-7f6fd99b1000 rwxp 00000000 00:00 0 
+7f6fd99b1000-7f6fe0ba0000 ---p 00000000 00:00 0 
+7f6fe0ba0000-7f6fe0e10000 rwxp 00000000 00:00 0 
+7f6fe0e10000-7f6fe8000000 ---p 00000000 00:00 0 
+7f6fe8000000-7f6fe84ce000 rw-p 00000000 00:00 0 
+7f6fe84ce000-7f6fec000000 ---p 00000000 00:00 0 
+7f6fec005000-7f6fec9ec000 rw-p 00000000 00:00 0 
+7f6fec9ec000-7f6fec9ed000 ---p 00000000 00:00 0 
+7f6fec9ed000-7f6fecaee000 rw-p 00000000 00:00 0 
+7f6fecaee000-7f6fecaef000 ---p 00000000 00:00 0 
+7f6fecaef000-7f6fecbf0000 rw-p 00000000 00:00 0 
+7f6fecbf0000-7f6fecbf1000 ---p 00000000 00:00 0 
+7f6fecbf1000-7f6fee047000 rw-p 00000000 00:00 0 
+7f6fee047000-7f6fee12b000 ---p 00000000 00:00 0 
+7f6fee12b000-7f6fee130000 rw-p 00000000 00:00 0 
+7f6fee130000-7f6fee214000 ---p 00000000 00:00 0 
+7f6fee214000-7f6fee220000 r--p 00000000 fd:01 15342226                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjava.so
+7f6fee220000-7f6fee232000 r-xp 0000c000 fd:01 15342226                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjava.so
+7f6fee232000-7f6fee238000 r--p 0001e000 fd:01 15342226                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjava.so
+7f6fee238000-7f6fee239000 ---p 00024000 fd:01 15342226                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjava.so
+7f6fee239000-7f6fee23a000 r--p 00024000 fd:01 15342226                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjava.so
+7f6fee23a000-7f6fee23b000 rw-p 00025000 fd:01 15342226                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjava.so
+7f6fee23b000-7f6fee23c000 rw-p 00000000 00:00 0 
+7f6fee23c000-7f6fee23f000 r--p 00000000 fd:01 5112244                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f6fee23f000-7f6fee246000 r-xp 00003000 fd:01 5112244                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f6fee246000-7f6fee248000 r--p 0000a000 fd:01 5112244                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f6fee248000-7f6fee249000 r--p 0000b000 fd:01 5112244                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f6fee249000-7f6fee24a000 rw-p 0000c000 fd:01 5112244                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f6fee24a000-7f6fee250000 rw-p 00000000 00:00 0 
+7f6fee25b000-7f6fee262000 rw-p 00000000 00:00 0 
+7f6fee262000-7f6fee26a000 ---p 00000000 00:00 0 
+7f6fee26a000-7f6fee272000 rw-s 00000000 fd:01 49938783                   /tmp/hsperfdata_wax/617549
+7f6fee272000-7f6fee273000 ---p 00000000 00:00 0 
+7f6fee273000-7f6fee274000 r--p 00000000 00:00 0 
+7f6fee274000-7f6fee278000 ---p 00000000 00:00 0 
+7f6fee278000-7f6fee375000 rw-p 00000000 00:00 0 
+7f6fee375000-7f6fee384000 r--p 00000000 fd:01 5112186                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f6fee384000-7f6fee42b000 r-xp 0000f000 fd:01 5112186                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f6fee42b000-7f6fee4c2000 r--p 000b6000 fd:01 5112186                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f6fee4c2000-7f6fee4c3000 r--p 0014c000 fd:01 5112186                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f6fee4c3000-7f6fee4c4000 rw-p 0014d000 fd:01 5112186                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f6fee4c4000-7f6fee73d000 r--p 00000000 fd:01 15342214                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so
+7f6fee73d000-7f6fefee1000 r-xp 00279000 fd:01 15342214                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so
+7f6fefee1000-7f6ff02f1000 r--p 01a1d000 fd:01 15342214                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so
+7f6ff02f1000-7f6ff03b5000 r--p 01e2c000 fd:01 15342214                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so
+7f6ff03b5000-7f6ff03f1000 rw-p 01ef0000 fd:01 15342214                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/server/libjvm.so
+7f6ff03f1000-7f6ff04c9000 rw-p 00000000 00:00 0 
+7f6ff04c9000-7f6ff04d0000 r--p 00000000 fd:01 5112284                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f6ff04d0000-7f6ff04e1000 r-xp 00007000 fd:01 5112284                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f6ff04e1000-7f6ff04e6000 r--p 00018000 fd:01 5112284                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f6ff04e6000-7f6ff04e7000 r--p 0001c000 fd:01 5112284                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f6ff04e7000-7f6ff04e8000 rw-p 0001d000 fd:01 5112284                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f6ff04e8000-7f6ff04ec000 rw-p 00000000 00:00 0 
+7f6ff04ec000-7f6ff04ed000 r--p 00000000 fd:01 5112184                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f6ff04ed000-7f6ff04ef000 r-xp 00001000 fd:01 5112184                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f6ff04ef000-7f6ff04f0000 r--p 00003000 fd:01 5112184                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f6ff04f0000-7f6ff04f1000 r--p 00003000 fd:01 5112184                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f6ff04f1000-7f6ff04f2000 rw-p 00004000 fd:01 5112184                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f6ff04f2000-7f6ff04f4000 r--p 00000000 fd:01 5115138                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f6ff04f4000-7f6ff0505000 r-xp 00002000 fd:01 5115138                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f6ff0505000-7f6ff050b000 r--p 00013000 fd:01 5115138                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f6ff050b000-7f6ff050c000 ---p 00019000 fd:01 5115138                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f6ff050c000-7f6ff050d000 r--p 00019000 fd:01 5115138                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f6ff050d000-7f6ff050e000 rw-p 0001a000 fd:01 5115138                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f6ff050e000-7f6ff0533000 r--p 00000000 fd:01 5112179                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f6ff0533000-7f6ff06ab000 r-xp 00025000 fd:01 5112179                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f6ff06ab000-7f6ff06f5000 r--p 0019d000 fd:01 5112179                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f6ff06f5000-7f6ff06f6000 ---p 001e7000 fd:01 5112179                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f6ff06f6000-7f6ff06f9000 r--p 001e7000 fd:01 5112179                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f6ff06f9000-7f6ff06fc000 rw-p 001ea000 fd:01 5112179                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f6ff06fc000-7f6ff0700000 rw-p 00000000 00:00 0 
+7f6ff0701000-7f6ff0704000 r--p 00000000 fd:01 15342230                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjimage.so
+7f6ff0704000-7f6ff0718000 r-xp 00003000 fd:01 15342230                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjimage.so
+7f6ff0718000-7f6ff071f000 r--p 00017000 fd:01 15342230                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjimage.so
+7f6ff071f000-7f6ff0721000 r--p 0001d000 fd:01 15342230                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjimage.so
+7f6ff0721000-7f6ff0722000 rw-p 0001f000 fd:01 15342230                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjimage.so
+7f6ff0722000-7f6ff0724000 r--p 00000000 fd:01 15342221                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjli.so
+7f6ff0724000-7f6ff072e000 r-xp 00002000 fd:01 15342221                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjli.so
+7f6ff072e000-7f6ff0731000 r--p 0000c000 fd:01 15342221                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjli.so
+7f6ff0731000-7f6ff0732000 ---p 0000f000 fd:01 15342221                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjli.so
+7f6ff0732000-7f6ff0733000 r--p 0000f000 fd:01 15342221                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjli.so
+7f6ff0733000-7f6ff0734000 rw-p 00010000 fd:01 15342221                   /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk/lib/libjli.so
+7f6ff0734000-7f6ff0736000 rw-p 00000000 00:00 0 
+7f6ff0736000-7f6ff0737000 r--p 00000000 fd:01 5112175                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f6ff0737000-7f6ff075a000 r-xp 00001000 fd:01 5112175                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f6ff075a000-7f6ff0762000 r--p 00024000 fd:01 5112175                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f6ff0762000-7f6ff0763000 ---p 00000000 00:00 0 
+7f6ff0763000-7f6ff0764000 r--p 0002c000 fd:01 5112175                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f6ff0764000-7f6ff0765000 rw-p 0002d000 fd:01 5112175                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f6ff0765000-7f6ff0766000 rw-p 00000000 00:00 0 
+7fffa8cc9000-7fffa8cea000 rw-p 00000000 00:00 0                          [stack]
+7fffa8cfc000-7fffa8cff000 r--p 00000000 00:00 0                          [vvar]
+7fffa8cff000-7fffa8d00000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
+
+
+VM Arguments:
+jvm_args: -Dapplication.home=/home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/jdk --add-modules=ALL-DEFAULT -Xms8m -Djlink.debug=true -Djdk.module.main=jdk.jlink 
+java_command: jdk.jlink/jdk.tools.jlink.internal.Main --module-path /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/support/interim-jmods --endian little --output /home/wax/workbench/jdk/build/linux-x86_64-server-fastdebug/support/interim-image --disable-plugin generate-jli-classes --add-modules java.base,java.logging
+java_class_path (initial): <not set>
+Launcher Type: SUN_STANDARD
+
+[Global flags]
+     intx CICompilerCount                          = 12                                        {product} {ergonomic}     Number of compiler threads to run
+     uint ConcGCThreads                            = 5                                         {product} {ergonomic}     Number of threads concurrent gc will use
+     uint G1ConcRefinementThreads                  = 18                                        {product} {ergonomic}     The number of parallel rem set update threads. Will be set ergonomically by default.
+   size_t G1HeapRegionSize                         = 4194304                                   {product} {ergonomic}     Size of the G1 regions.
+    uintx GCDrainStackTargetSize                   = 64                                        {product} {ergonomic}     Number of entries we will try to leave on the stack during parallel gc
+   size_t InitialHeapSize                          = 8388608                                   {product} {command line}  Initial heap size (in bytes); zero means use ergonomics
+   size_t MarkStackSize                            = 4194304                                   {product} {ergonomic}     Size of marking stack
+   size_t MaxHeapSize                              = 8413773824                                {product} {ergonomic}     Maximum heap size (in bytes)
+   size_t MaxNewSize                               = 5045747712                                {product} {ergonomic}     Maximum new generation size (in bytes), max_uintx means set ergonomically
+   size_t MinHeapDeltaBytes                        = 4194304                                   {product} {ergonomic}     The minimum change in heap space due to GC (in bytes)
+   size_t MinHeapSize                              = 8388608                                   {product} {command line}  Minimum heap size (in bytes); zero means use ergonomics
+    uintx NonNMethodCodeHeapSize                   = 7602480                                {pd product} {ergonomic}     Size of code heap with non-nmethods (in bytes)
+    uintx NonProfiledCodeHeapSize                  = 122027880                              {pd product} {ergonomic}     Size of code heap with non-profiled methods (in bytes)
+    uintx ProfiledCodeHeapSize                     = 122027880                              {pd product} {ergonomic}     Size of code heap with profiled methods (in bytes)
+    uintx ReservedCodeCacheSize                    = 251658240                              {pd product} {ergonomic}     Reserved code cache size (in bytes) - maximum code cache size
+     bool SegmentedCodeCache                       = true                                      {product} {ergonomic}     Use a segmented code cache
+   size_t SoftMaxHeapSize                          = 8413773824                             {manageable} {ergonomic}     Soft limit for maximum heap size (in bytes)
+     bool UseCompressedClassPointers               = true                                 {lp64_product} {ergonomic}     Use 32-bit class pointers in 64-bit VM. lp64_product means flag is always constant in 32 bit VM
+     bool UseCompressedOops                        = true                                 {lp64_product} {ergonomic}     Use 32-bit object references in 64-bit VM. lp64_product means flag is always constant in 32 bit VM
+     bool UseG1GC                                  = true                                      {product} {ergonomic}     Use the Garbage-First garbage collector
+
+Logging:
+Log output configuration:
+ #0: stdout all=warning uptime,level,tags
+ #1: stderr all=off uptime,level,tags
+
+Environment Variables:
+PATH=/home/wax/.local/bin:/home/wax/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/wax/.antigen/bundles/robbyrussell/oh-my-zsh/lib:/home/wax/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/git:/home/wax/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/command-not-found:/home/wax/.antigen/bundles/zsh-users/zsh-autosuggestions:/home/wax/.antigen/bundles/zsh-users/zsh-history-substring-search:/home/wax/.antigen/bundles/zsh-users/zsh-syntax-highlighting:/home/wax/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/shrink-path
+USERNAME=wax
+SHELL=/usr/bin/zsh
+DISPLAY=:1
+LANG=en_US.UTF-8
+LC_ALL=C
+
+Signal Handlers:
+SIGSEGV: [libjvm.so+0x1906d60], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGBUS: [libjvm.so+0x1906d60], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGFPE: [libjvm.so+0x1906d60], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGPIPE: [libjvm.so+0x1417a10], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGXFSZ: [libjvm.so+0x1417a10], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGILL: [libjvm.so+0x1906d60], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGUSR2: [libjvm.so+0x1417820], sa_mask[0]=00000000000000000000000000000000, sa_flags=SA_RESTART|SA_SIGINFO
+SIGHUP: [libjvm.so+0x1418540], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGINT: [libjvm.so+0x1418540], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGTERM: [libjvm.so+0x1418540], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+SIGQUIT: [libjvm.so+0x1418540], sa_mask[0]=11111111011111111101111111111110, sa_flags=SA_RESTART|SA_SIGINFO
+
+
+---------------  S Y S T E M  ---------------
+
+OS:
+DISTRIB_ID=Pop
+DISTRIB_RELEASE=20.04
+DISTRIB_CODENAME=focal
+DISTRIB_DESCRIPTION="Pop!_OS 20.04 LTS"
+uname: Linux tesla 5.4.0-7634-generic #38~1592497129~20.04~9a1ea2e-Ubuntu SMP Fri Jun 19 22:43:37 UTC  x86_64
+OS uptime: 3 days 21:51 hours
+libc: glibc 2.31 NPTL 2.31 
+rlimit (soft/hard): STACK 8192k/infinity , CORE 0k/infinity , NPROC 127741/127741 , NOFILE 1048576/1048576 , AS infinity/infinity , CPU infinity/infinity , DATA infinity/infinity , FSIZE infinity/infinity , MEMLOCK 65536k/65536k
+load average: 0.57 0.55 0.39
+
+/proc/meminfo:
+MemTotal:       32860560 kB
+MemFree:         2601784 kB
+MemAvailable:   20069556 kB
+Buffers:          994332 kB
+Cached:         16609936 kB
+SwapCached:            0 kB
+Active:         18694304 kB
+Inactive:        7983516 kB
+Active(anon):    9080700 kB
+Inactive(anon):   723580 kB
+Active(file):    9613604 kB
+Inactive(file):  7259936 kB
+Unevictable:         208 kB
+Mlocked:             208 kB
+SwapTotal:       4193784 kB
+SwapFree:        4193784 kB
+Dirty:            522912 kB
+Writeback:             0 kB
+AnonPages:       9074564 kB
+Mapped:          1918336 kB
+Shmem:            736232 kB
+KReclaimable:    1057880 kB
+Slab:            1408628 kB
+SReclaimable:    1057880 kB
+SUnreclaim:       350748 kB
+KernelStack:       43568 kB
+PageTables:        99768 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:    20624064 kB
+Committed_AS:   34915244 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:       70316 kB
+VmallocChunk:          0 kB
+Percpu:            34304 kB
+HardwareCorrupted:     0 kB
+AnonHugePages:         0 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:         0 kB
+FilePmdMapped:         0 kB
+CmaTotal:              0 kB
+CmaFree:               0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+DirectMap4k:     2910172 kB
+DirectMap2M:    25315328 kB
+DirectMap1G:     6291456 kB
+
+/sys/kernel/mm/transparent_hugepage/enabled: always [madvise] never
+/sys/kernel/mm/transparent_hugepage/defrag (defrag/compaction efforts parameter): always defer defer+madvise [madvise] never
+
+/proc/sys/kernel/threads-max (system-wide limit on the number of threads): 255482
+/proc/sys/vm/max_map_count (maximum number of memory map areas a process may have): 65530
+/proc/sys/kernel/pid_max (system-wide limit on number of process identifiers): 4194304
+
+container (cgroup) information:
+container_type: cgroupv1
+cpu_cpuset_cpus: 0-23
+cpu_memory_nodes: 0
+active_processor_count: 24
+cpu_quota: no quota
+cpu_period: 100000
+cpu_shares: no shares
+memory_limit_in_bytes: unlimited
+memory_and_swap_limit_in_bytes: not supported
+memory_soft_limit_in_bytes: unlimited
+memory_usage_in_bytes: 25319563264
+memory_max_usage_in_bytes: 27515346944
+
+Steal ticks since vm start: 0
+Steal ticks percentage since vm start:  0.000
+
+CPU: total 24 (initial active 24) (24 cores per cpu, 2 threads per core) family 23 model 113 stepping 0, cmov, cx8, fxsr, mmx, sse, sse2, sse3, ssse3, sse4.1, sse4.2, popcnt, vzeroupper, avx, avx2, aes, clmul, 3dnowpref, lzcnt, sse4a, ht, tsc, tscinvbit, tscinv, bmi1, bmi2, adx, sha, fma, clflush, clflushopt
+CPU Model and flags from /proc/cpuinfo:
+model name	: AMD Ryzen 9 3900X 12-Core Processor
+flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate sme ssbd mba sev ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local clzero irperf xsaveerptr wbnoinvd arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif umip rdpid overflow_recov succor smca
+
+Online cpus: 0-23
+Offline cpus: 24-31
+cache level: 1
+cache type: Data
+cache size: 32K
+cache coherency line size: 64
+cache level: 1
+cache type: Instruction
+cache size: 32K
+cache coherency line size: 64
+cache level: 2
+cache type: Unified
+cache size: 512K
+cache coherency line size: 64
+cache level: 3
+cache type: Unified
+cache size: 16384K
+cache coherency line size: 64
+BIOS frequency limitation: 3800000
+Frequency switch latency (ns): 0
+Available cpu frequencies: 3800000 2800000 2200000 
+Maximum cpu frequency: 3800000
+Minimum cpu frequency: 2200000
+Current cpu frequency: 4064098
+Available governors: conservative ondemand userspace powersave performance schedutil 
+Current governor: ondemand
+Core performance/turbo boost: 1
+
+Memory: 4k page, physical 32860560k(2600776k free), swap 4193784k(4193784k free)
+
+vm_info: OpenJDK 64-Bit Server VM (fastdebug 16-internal+0-adhoc.wax.jdk) for linux-amd64 JRE (16-internal+0-adhoc.wax.jdk), built on Jun 30 2020 13:42:06 by "wax" with gcc 9.3.0
+
+END.
