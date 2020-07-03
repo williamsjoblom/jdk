@@ -21,11 +21,6 @@ public:
   //   : _head(head), _tail(tail), _base_ptr(base_ptr), _out(out) {}
 };
 
-// The indeterminate is the
-class Indeterminate {
-
-};
-
 // Is the given counted loop's induction variable used directly used
 // in an array access?
 bool get_array_access_chain(Node *head, InductionArrayRead& chain) {
@@ -64,7 +59,7 @@ PhiNode *find_reduction_phi(CountedLoopNode *cl) {
   // CountedLoop (excluding the phi node associated with the induction
   // variable).
   Node *induction_phi = cl->phi();
-  assert(induction_phi != NULL, "expected");
+  if (induction_phi == NULL) return NULL;
 
   Node *reduction_phi = NULL;
   for (DUIterator it = cl->outs(); cl->has_out(it); it++) {
@@ -79,7 +74,7 @@ PhiNode *find_reduction_phi(CountedLoopNode *cl) {
     }
   }
 
-  return reduction_phi->as_Phi();
+  return reduction_phi != NULL ? reduction_phi->as_Phi() : NULL;
 }
 
 // DFS following DU-edges searching for a member of `nodes`. Depth
@@ -132,7 +127,7 @@ Node *find_rhs(AddNode *acc_add, Node* lhs) {
   return NULL;
 }
 
-#define ANY NULL
+#define ANY (Pattern*)NULL
 
 class Pattern : public ResourceObj {
 protected:
@@ -144,37 +139,38 @@ public:
   int _ref;
 
   Pattern(int ref) : _ref(ref) {}
+  virtual ~Pattern() {}
   virtual bool match(Node *n, Node *refs[]) = 0;
-
 };
 
+// TODO: Make Opcode a field instead of a template parameter.
 template<int Opcode, uint NSubpatterns>
-class NodePattern : public Pattern {
+class OpcodePattern : public Pattern {
 public:
   Pattern* _subpatterns[NSubpatterns];
 
-  NodePattern(int ref=NO_REF) : Pattern(ref) {
+  OpcodePattern(int ref=NO_REF) : Pattern(ref) {
     assert(NSubpatterns == 0, "expected");
   }
 
-  NodePattern(Pattern *p0, int ref=NO_REF) : Pattern(ref) {
+  OpcodePattern(Pattern *p0, int ref=NO_REF) : Pattern(ref) {
     assert(NSubpatterns == 1, "expected");
     _subpatterns[0] = p0;
   }
 
-  NodePattern(Pattern *p0, Pattern *p1, int ref=NO_REF) : Pattern(ref) {
+  OpcodePattern(Pattern *p0, Pattern *p1, int ref=NO_REF) : Pattern(ref) {
     assert(NSubpatterns == 2, "expected");
     _subpatterns[0] = p0;
     _subpatterns[1] = p1;
   }
 
-  NodePattern(Pattern *p0, Pattern *p1, Pattern *p2, int ref=NO_REF) : Pattern(ref) {
+  OpcodePattern(Pattern *p0, Pattern *p1, Pattern *p2, int ref=NO_REF) : Pattern(ref) {
     assert(NSubpatterns == 3, "expected");
     _subpatterns[0] = p0; _subpatterns[1] = p1;
     _subpatterns[2] = p2;
   }
 
-  NodePattern(Pattern *p0, Pattern *p1, Pattern *p2, Pattern *p3, int ref=NO_REF) : Pattern(ref) {
+  OpcodePattern(Pattern *p0, Pattern *p1, Pattern *p2, Pattern *p3, int ref=NO_REF) : Pattern(ref) {
     assert(NSubpatterns == 4, "expected");
     _subpatterns[0] = p0; _subpatterns[1] = p1;
     _subpatterns[2] = p2; _subpatterns[3] = p3;
@@ -184,11 +180,12 @@ public:
     if (n->Opcode() != Opcode) return false;
 
     for (uint i = 0; i < n->req() && i < NSubpatterns; i++) {
-      tty->print("Matching at: %d\n", i);
       Node *next = n->in(i);
       Pattern *sp = _subpatterns[i];
       if (sp != ANY) {
-        if (next == NULL || !sp->match(next, refs)) return false;
+        if (next == NULL || !sp->match(next, refs)) {
+          return false;
+        }
       }
     }
 
@@ -209,10 +206,11 @@ public:
   }
 };
 
-typedef bool (*NodePred)(Node*);
+typedef bool (*NodePred)(Node *);
 class PredPattern : public Pattern {
+private:
   NodePred _pred;
-
+public:
   PredPattern(NodePred pred, int ref=NO_REF) : Pattern(ref), _pred(pred) {}
 
   bool match(Node *n, Node *refs[]) {
@@ -225,7 +223,21 @@ class PredPattern : public Pattern {
   }
 };
 
-bool pattern_match(Node *start, Node *x) {
+// Unconditionally matches a node, saving it as a ref.
+class CapturePattern : public Pattern {
+public:
+  CapturePattern(int ref) : Pattern(ref) {}
+  bool match(Node *n, Node *refs[]) {
+    set_ref(n, refs);
+    return true;
+  }
+};
+
+bool is_array_ptr(Node *n) {
+  return n->is_Type() && n->as_Type()->type()->isa_aryptr() != NULL;
+}
+
+bool match_x_mul_31(Node *start, Node *x) {
   ResourceMark rm;
 
   enum {
@@ -234,16 +246,117 @@ bool pattern_match(Node *start, Node *x) {
   };
 
   Node *refs[N_REFS];
-  Pattern *p = new NodePattern<Op_SubI, 3>
-    (ANY,
-     new NodePattern<Op_LShiftI, 3>
-     (ANY,
-      new ExactNodePattern(x),
-      new NodePattern<Op_ConI, 0>(THE_CONSTANT)),
-     new ExactNodePattern(x));
+  Pattern *p = new OpcodePattern<Op_SubI, 3>
+    (ANY,                                         // Control
+     new OpcodePattern<Op_LShiftI, 3>               // LHS
+     (ANY,                                            // Control
+      new ExactNodePattern(x),                        // LHS
+      new OpcodePattern<Op_ConI, 0>(THE_CONSTANT)),     // RHS
+     new ExactNodePattern(x));                    // RHS
 
   if (p->match(start, refs)) {
     tty->print("Successfully matched with shift distance %d\n", refs[THE_CONSTANT]->get_int());
+    return true;
+  } else {
+    return false;
+  }
+}
+
+// Array read pattern instance.
+struct ArrayRead {
+  // Node indexing the array.
+  Node *_index;
+
+  // Array being indexed.
+  Node *_array_ptr;
+
+  // Memory state.
+  Node *_memory;
+
+  // Node producing the result.
+  Node *_result;
+
+  // Size, in bytes, of each element.
+  jint _elem_byte_size;
+
+  // Base offset of the array.
+  jlong _base_offset;
+};
+
+struct ConMul {
+  jint multiplier;
+};
+
+// Match multiplication of `of`*constant.
+bool match_con_mul(Node *start, Node *of, ConMul &result) {
+  enum {
+    SHIFT_DISTANCE,
+
+    N_REFS
+  };
+
+  Node *refs[N_REFS];
+  Pattern *p = new OpcodePattern<Op_SubI, 3>(
+      ANY,
+      new OpcodePattern<Op_LShiftI, 3>
+      (ANY,
+       new ExactNodePattern(of),
+       new OpcodePattern<Op_ConI, 0>(SHIFT_DISTANCE)),
+      new ExactNodePattern(of));
+
+  if (p->match(start, refs)) {
+    result.multiplier = (1 << refs[SHIFT_DISTANCE]->get_int()) - 1;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
+  ResourceMark rm;
+
+  enum {
+    ARRAY,
+    MEMORY,
+    IDX_SHIFT_DISTANCE,
+    ARRAY_BASE_OFFSET,
+    CAST_II,
+
+    N_REFS
+  };
+
+  Node *refs[N_REFS];
+  Pattern *p = new OpcodePattern<Op_LoadI, 3>
+    (ANY,
+     new OpcodePattern<Op_Parm, 0>(MEMORY),
+     new OpcodePattern<Op_AddP, 4>
+     (ANY,
+      ANY,
+      new OpcodePattern<Op_AddP, 4>
+      (ANY,                            // AddP: Control
+       ANY,                            // AddP: Base
+       new PredPattern(is_array_ptr, ARRAY), // AddP: Address
+       new OpcodePattern<Op_LShiftL, 3>  // AddP: Offset
+       (ANY,                           // LShiftL: Control
+        new OpcodePattern<Op_ConvI2L, 2> // LShiftL: Left-hand side
+        (ANY,                          // ConvI2L: Control
+         new OpcodePattern<Op_CastII, 2> // ConvI2L: Data
+         (ANY,                         // CastII:  Control
+          new ExactNodePattern(idx),   // CastII:  Index
+          CAST_II)),
+        new OpcodePattern<Op_ConI, 0>(IDX_SHIFT_DISTANCE))),
+      new OpcodePattern<Op_ConL, 0>(ARRAY_BASE_OFFSET)));
+
+  if (p->match(start, refs)) {
+    //tty->print("ISARY? %d\n", (bool)refs[ARRAY]->as_Type()->type()->isa_aryptr());
+
+    result._index = idx;
+    result._result = start;
+    result._array_ptr = refs[ARRAY];
+    result._memory = refs[MEMORY];
+    result._elem_byte_size = 1 << refs[IDX_SHIFT_DISTANCE]->get_int();
+    result._base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
+
     return true;
   } else {
     return false;
@@ -312,6 +425,9 @@ bool is_polynomial_reduction(CountedLoopNode *cl) {
 }
 
 void build_stuff(CountedLoopNode *cl) {
+  Node *induction_phi = cl->phi();
+  if (induction_phi == NULL) return;
+
   // PHI holding the current value of the `h`.
   PhiNode *reduction_phi = find_reduction_phi(cl);
   if (reduction_phi == NULL) return;
@@ -322,17 +438,35 @@ void build_stuff(CountedLoopNode *cl) {
   Node *rhs = find_rhs(acc_add, reduction_phi);
   if (rhs == NULL) return;
 
-  tty->print("Patternmatching: %d\n", pattern_match(rhs->in(1), reduction_phi));
+  ConMul con_mul;
+  ArrayRead array_read;
 
-  tty->print("CL %d: reduction_phi=%d, acc_add=%d, rhs=%d, rhs[1] is mul31*phi=%d\n",
-            cl->_idx,
-            reduction_phi->_idx,
-            acc_add->_idx,
-            rhs->_idx,
-            is_x_mul_31(rhs->in(1), reduction_phi));
+  bool ok1 = match_con_mul(rhs->in(1), reduction_phi, con_mul);
+  bool ok2 = match_array_read(rhs->in(2), induction_phi, array_read);
+
+  tty->print("Matched CountedLoop %d\n", cl->_idx);
+  if (ok1) {
+    tty->print("  Reduction variable multiplier by: %d\n", con_mul.multiplier);
+  }
+
+  if (ok2) {
+    tty->print("  Array read: i%d %d[%d]\n", array_read._elem_byte_size * 8,
+              array_read._array_ptr->_idx, array_read._index->_idx);
+  }
+
+  // tty->print("Patternmatching *32: %d\n", match_con_mul(rhs->in(1), reduction_phi, con_mul));
+  // tty->print("Patternmatching a[i]: %d\n", match_array_read(rhs->in(2), reduction_phi, array_read));
+
+  // tty->print("CL %d: reduction_phi=%d, acc_add=%d, rhs=%d, rhs[1] is mul31*phi=%d\n",
+  //           cl->_idx,
+  //           reduction_phi->_idx,
+  //           acc_add->_idx,
+  //           rhs->_idx,
+  //           is_x_mul_31(rhs->in(1), reduction_phi));
 }
 
 void polynomial_reduction_analyze(IdealLoopTree *lpt) {
+
   if (!lpt->is_counted() || !lpt->is_innermost()) return;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
   if (!cl->stride_is_con() || cl->is_polynomial_reduction()) return;
