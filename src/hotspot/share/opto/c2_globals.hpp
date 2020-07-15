@@ -373,11 +373,11 @@
           "as well by using CompileCommand=option.")                        \
           range(-1, 4)                                                      \
                                                                             \
-  notproduct(intx, PrintIdealGraphPort, 4444,                               \
+  notproduct(intx, PrintIdealGraphPort, 4445,                               \
           "Ideal graph printer to network port")                            \
           range(0, SHRT_MAX)                                                \
                                                                             \
-  notproduct(ccstr, PrintIdealGraphAddress, "127.0.0.1",                    \
+  notproduct(ccstr, PrintIdealGraphAddress, "localhost",                    \
           "IP address to connect to visualizer")                            \
                                                                             \
   notproduct(ccstr, PrintIdealGraphFile, NULL,                              \
@@ -778,5 +778,7 @@
                                                                             \
   diagnostic(bool, ExpandSubTypeCheckAtParseTime, false,                    \
           "Do not use subtype check macro node")                            \
-
+                                                                            \
+  product(bool, SuperWordPolynomial, false,                                 \
+          "Use polynomial reduction support in superword")
 #endif // SHARE_OPTO_C2_GLOBALS_HPP

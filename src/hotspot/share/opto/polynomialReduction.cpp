@@ -6,6 +6,9 @@
 #include "opto/memnode.hpp"
 #include "opto/mulnode.hpp"
 #include "opto/connode.hpp"
+#include "opto/type.hpp"
+#include "opto/vectornode.hpp"
+#include "opto/callnode.hpp"
 
 const uint MAX_SEARCH_DEPTH = 20;
 
@@ -106,8 +109,7 @@ AddNode *find_acc_add(PhiNode *reduction_phi) {
   Unique_Node_List visited;
   Node *bottom = find_nodes(reduction_phi, inputs, visited);
 
-  if (!bottom->is_Add()) return NULL;
-  return bottom->as_Add();
+  return bottom != NULL ? bottom->isa_Add() : NULL;
 }
 
 // Find node representing the right hand side of the reduction given
@@ -126,6 +128,10 @@ Node *find_rhs(AddNode *acc_add, Node* lhs) {
 
   return NULL;
 }
+
+/****************************************************************
+ * Pattern matching.
+ ****************************************************************/
 
 #define ANY (Pattern*)NULL
 
@@ -264,6 +270,11 @@ bool match_x_mul_31(Node *start, Node *x) {
 
 // Array read pattern instance.
 struct ArrayRead {
+  Node *_load;
+
+  // Load control dep.
+  Node *_load_ctrl;
+
   // Node indexing the array.
   Node *_index;
 
@@ -316,6 +327,8 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
   ResourceMark rm;
 
   enum {
+    LOAD_NODE,
+    LOAD_CTRL,
     ARRAY,
     MEMORY,
     IDX_SHIFT_DISTANCE,
@@ -327,7 +340,7 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
 
   Node *refs[N_REFS];
   Pattern *p = new OpcodePattern<Op_LoadI, 3>
-    (ANY,
+    (new CapturePattern(LOAD_CTRL),
      new OpcodePattern<Op_Parm, 0>(MEMORY),
      new OpcodePattern<Op_AddP, 4>
      (ANY,
@@ -345,11 +358,12 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
           new ExactNodePattern(idx),   // CastII:  Index
           CAST_II)),
         new OpcodePattern<Op_ConI, 0>(IDX_SHIFT_DISTANCE))),
-      new OpcodePattern<Op_ConL, 0>(ARRAY_BASE_OFFSET)));
+      new OpcodePattern<Op_ConL, 0>(ARRAY_BASE_OFFSET)),
+      LOAD_NODE);
 
   if (p->match(start, refs)) {
-    //tty->print("ISARY? %d\n", (bool)refs[ARRAY]->as_Type()->type()->isa_aryptr());
-
+    result._load_ctrl = refs[LOAD_CTRL];
+    result._load = refs[LOAD_NODE];
     result._index = idx;
     result._result = start;
     result._array_ptr = refs[ARRAY];
@@ -357,6 +371,7 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
     result._elem_byte_size = 1 << refs[IDX_SHIFT_DISTANCE]->get_int();
     result._base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
 
+    assert(result._load_ctrl->isa_Proj(), "");
     return true;
   } else {
     return false;
@@ -398,8 +413,6 @@ bool is_self_dependent(PhiNode *phi) {
   return bottom != NULL;
 }
 
-
-
 GrowableArray<InductionArrayRead> get_array_access_chains(Node *phi) {
   GrowableArray<InductionArrayRead> chains;
 
@@ -416,6 +429,19 @@ GrowableArray<InductionArrayRead> get_array_access_chains(Node *phi) {
   return chains;
 }
 
+void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
+  assert(cl->stride_is_con(), "setting stride for non const stride loop");
+
+  ConNode *stride = ConNode::make(TypeInt::make(new_stride));
+  phase->igvn().register_new_node_with_optimizer(stride);
+
+  Node *incr = cl->incr();
+  if (incr != NULL && incr->req() == 3) {
+    incr->set_req_X(2, stride, &phase->igvn());
+  } else {
+    ShouldNotReachHere();
+  }
+}
 
 // Is `cl` a polynomial reduction?
 bool is_polynomial_reduction(CountedLoopNode *cl) {
@@ -424,19 +450,21 @@ bool is_polynomial_reduction(CountedLoopNode *cl) {
   return reduction_phi != NULL && is_self_dependent(reduction_phi);
 }
 
-void build_stuff(CountedLoopNode *cl) {
+
+
+bool build_stuff(Compile *C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedLoopNode *cl) {
   Node *induction_phi = cl->phi();
-  if (induction_phi == NULL) return;
+  if (induction_phi == NULL) return false;
 
   // PHI holding the current value of the `h`.
   PhiNode *reduction_phi = find_reduction_phi(cl);
-  if (reduction_phi == NULL) return;
+  if (reduction_phi == NULL) return false;
   // ADD adding the result of the current iteration to `h`
   AddNode *acc_add = find_acc_add(reduction_phi);
-  if (acc_add == NULL) return;
+  if (acc_add == NULL) return false;
   // Right hand side of the assignment.
   Node *rhs = find_rhs(acc_add, reduction_phi);
-  if (rhs == NULL) return;
+  if (rhs == NULL) return false;
 
   ConMul con_mul;
   ArrayRead array_read;
@@ -448,12 +476,49 @@ void build_stuff(CountedLoopNode *cl) {
   if (ok1) {
     tty->print("  Reduction variable multiplier by: %d\n", con_mul.multiplier);
   }
-
   if (ok2) {
     tty->print("  Array read: i%d %d[%d]\n", array_read._elem_byte_size * 8,
               array_read._array_ptr->_idx, array_read._index->_idx);
+    //tty->print_cr("basic_type; %d", TypeInt::make(1337)->basic_type());
+
   }
 
+  if (ok1 && ok2 && cl->_idx == 167) {
+    // set_stride(cl, phase, 4);
+    tty->print_cr("cl->stride() = %d", cl->stride()->_idx);
+
+    uint vector_size = 4 * 4; // 4 4byte ints
+    if (C->max_vector_size() < vector_size) {
+      C->set_max_vector_size(vector_size);
+    }
+
+    Node *out_phi = cl->find(155);
+    assert(out_phi->isa_Phi(), "a phi");
+
+    //ConNode *n = ConNode::make(TypeInt::make(42));
+    //Node *vector = VectorNode::scalar2vector(n, 4, TypeInt::INT);
+
+    Node *base_off = ConNode::make(TypeLong::make(array_read._base_offset));
+    Node *off_array_ptr = new AddPNode(array_read._array_ptr, array_read._array_ptr, base_off); // Array ptr + base offset
+
+    Node *addr = array_read._load->in(LoadNode::Address);
+    Node *vector = LoadVectorNode::make(array_read._load->Opcode(), NULL, array_read._memory,
+                                        off_array_ptr, array_read._load->adr_type(), 4, T_INT);
+    ConNode *reduce_base = ConNode::make(TypeInt::make(0));
+    Node *reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, vector, T_INT);
+
+    Node *ctrl = out_phi->find(53); // Return region.
+
+    // phase->register_new_node(base_off, out_phi->in(PhiNode::Region));
+    // phase->register_new_node(off_array_ptr, out_phi->in(PhiNode::Region));
+    // phase->register_new_node(vector, out_phi->in(PhiNode::Region));
+    // phase->register_new_node(reduce_base, out_phi->in(PhiNode::Region));
+    // phase->register_new_node(reduce, out_phi->in(PhiNode::Region));
+
+    // phase->igvn().replace_node(out_phi, reduce);
+  }
+
+  return ok1 && ok2 && cl->_idx == 167;
   // tty->print("Patternmatching *32: %d\n", match_con_mul(rhs->in(1), reduction_phi, con_mul));
   // tty->print("Patternmatching a[i]: %d\n", match_array_read(rhs->in(2), reduction_phi, array_read));
 
@@ -465,17 +530,21 @@ void build_stuff(CountedLoopNode *cl) {
   //           is_x_mul_31(rhs->in(1), reduction_phi));
 }
 
-void polynomial_reduction_analyze(IdealLoopTree *lpt) {
+bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
+  //if (!SuperWordPolynomial) return true;
 
-  if (!lpt->is_counted() || !lpt->is_innermost()) return;
+  if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
-  if (!cl->stride_is_con() || cl->is_polynomial_reduction()) return;
+  if (!cl->stride_is_con() || cl->is_polynomial_reduction()) return false;
 
-  if (is_polynomial_reduction(cl)) {
+  if (build_stuff(C, phase, igvn, cl)) {
     cl->mark_polynomial_reduction();
+    return true;
   }
 
-  build_stuff(cl);
+  tty->print_cr("SuperWordPolynomial? %d", SuperWordPolynomial);
+
+  return false;
 
   //ResourceMark rm;
   // GrowableArray<InductionArrayRead> chains = get_array_access_chains(cl->phi());

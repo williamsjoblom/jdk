@@ -2,7 +2,10 @@
 #define SHARE_OPTO_POLYNOMIALREDUCTION_HPP
 
 class IdealLoopTree;
+class Compile;
+class PhaseIdealLoop;
+class PhaseIterGVN;
 
-void polynomial_reduction_analyze(IdealLoopTree *lpt);
+bool polynomial_reduction_analyze(Compile *C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt);
 
 #endif

@@ -3305,16 +3305,15 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
   // wilsj
   if (C->has_loops() && mode == LoopOptsDefault) {
     // cl->phi() holds the trip counter
-    tty->print("In method: ");
-    C->method()->print_name();
+    // tty->print("In method: ");
+    // C->method()->print_name();
 
-    tty->print("\n");
+    // tty->print("\n");
     for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
       IdealLoopTree* lpt = iter.current();
-      polynomial_reduction_analyze(lpt);
+      if (polynomial_reduction_analyze(C, this, &_igvn, lpt))
+         C->set_major_progress();
     }
-
-    tty->print("\n\n");
   }
 
   // Cleanup any modified bits

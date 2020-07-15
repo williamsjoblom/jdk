@@ -67,7 +67,8 @@ NOT_PRODUCT(cflags(IGVPrintLevel,       intx, PrintIdealGraphLevel, IGVPrintLeve
     cflags(Vectorize,               bool, false, Vectorize) \
     cflags(VectorizeDebug,          uintx, 0, VectorizeDebug) \
     cflags(CloneMapDebug,           bool, false, CloneMapDebug) \
-    cflags(MaxNodeLimit,            intx, MaxNodeLimit, MaxNodeLimit)
+    cflags(MaxNodeLimit,            intx, MaxNodeLimit, MaxNodeLimit) \
+    cflags(SuperWordPolynomial,     bool, SuperWordPolynomial, SuperWordPolynomial)
 #else
   #define compilerdirectives_c2_flags(cflags)
 #endif
