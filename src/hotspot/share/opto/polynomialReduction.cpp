@@ -9,8 +9,10 @@
 #include "opto/type.hpp"
 #include "opto/vectornode.hpp"
 #include "opto/callnode.hpp"
+#include "opto/output.hpp"
 
 const uint MAX_SEARCH_DEPTH = 20;
+
 
 class InductionArrayRead {
 public:
@@ -100,7 +102,7 @@ Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List &visited, uint 
   return NULL;
 }
 
-AddNode *find_acc_add(PhiNode *reduction_phi) {
+AddNode *find_rhs(PhiNode *reduction_phi) {
   Node_List inputs;
   for (uint i = PhiNode::Input; i < reduction_phi->len(); i++) {
     inputs.push(reduction_phi->in(i));
@@ -112,22 +114,22 @@ AddNode *find_acc_add(PhiNode *reduction_phi) {
   return bottom != NULL ? bottom->isa_Add() : NULL;
 }
 
-// Find node representing the right hand side of the reduction given
-// the `acc_add` node, and the left hand side.
-//
-// Ex. h = 31*h + a[i];
-//         ^
-//         | this is the right hand side.
-Node *find_rhs(AddNode *acc_add, Node* lhs) {
-  for (uint i = 0; i < acc_add->req(); i++) {
-    Node *in = acc_add->in(i);
-    if (in != NULL && in != lhs) {
-      return in;
-    }
-  }
+// // Find node representing the right hand side of the reduction given
+// // the `acc_add` node, and the left hand side.
+// //
+// // Ex. h = 31*h + a[i];
+// //         ^
+// //         | this is the right hand side.
+// Node *find_rhs(AddNode *acc_add, Node* lhs) {
+//   for (uint i = 0; i < acc_add->req(); i++) {
+//     Node *in = acc_add->in(i);
+//     if (in != NULL && in != lhs) {
+//       return in;
+//     }
+//   }
 
-  return NULL;
-}
+//   return NULL;
+// }
 
 /****************************************************************
  * Pattern matching.
@@ -429,6 +431,9 @@ GrowableArray<InductionArrayRead> get_array_access_chains(Node *phi) {
   return chains;
 }
 
+/****************************************************************
+ * Main-loop patching
+ ****************************************************************/
 void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
   assert(cl->stride_is_con(), "setting stride for non const stride loop");
 
@@ -437,34 +442,82 @@ void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
 
   Node *incr = cl->incr();
   if (incr != NULL && incr->req() == 3) {
-    incr->set_req_X(2, stride, &phase->igvn());
+    phase->igvn().replace_input_of(incr, 2, stride);
   } else {
     ShouldNotReachHere();
   }
 }
 
+void adjust_limit_to_vec_size(CountedLoopNode *cl, PhaseIdealLoop *phase, jint vec_size) {
+  const uint LIMIT = 2;
+  Node *cmp = cl->loopexit()->cmp_node();
+  assert(cmp != NULL && cmp->req() == 3, "no loop limit found");
+  Node *limit = cmp->in(LIMIT);
+
+  Node *neg_vec_size = ConNode::make(TypeInt::make(-vec_size));
+  Node *adjusted_limit = new AddINode(limit, neg_vec_size);
+
+  assert(adjusted_limit != NULL, "adj limit");
+
+  phase->igvn().register_new_node_with_optimizer(neg_vec_size);
+  phase->igvn().register_new_node_with_optimizer(adjusted_limit);
+
+  phase->igvn().replace_input_of(cmp, LIMIT, adjusted_limit);
+}
+
 // Is `cl` a polynomial reduction?
 bool is_polynomial_reduction(CountedLoopNode *cl) {
   PhiNode *reduction_phi = find_reduction_phi(cl);
-
   return reduction_phi != NULL && is_self_dependent(reduction_phi);
 }
 
+// Make int vector containing [init, init, ..., init]
+VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size) {
+  ConNode *init_con = ConNode::make(TypeInt::make(init));
+  VectorNode *acc = VectorNode::scalar2vector(init_con, vec_size, TypeInt::INT);
 
+  phase->igvn().register_new_node_with_optimizer(init_con);
+  phase->igvn().register_new_node_with_optimizer(acc);
 
-bool build_stuff(Compile *C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedLoopNode *cl) {
+  return acc;
+}
+
+// Make 4 int vector containing [n^3, n^2, n^1, n^0].
+VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vec_size) {
+  assert(vec_size == 4, "not implemented");
+
+  ConNode *a = ConNode::make(TypeLong::make(((long)(n*n*n) << 32) | n*n));
+  ConNode *b = ConNode::make(TypeLong::make(((long)(n) << 32) | 1));
+  VectorNode *con = VectorNode::scalars2vector(a, b);
+  phase->igvn().register_new_node_with_optimizer(a);
+  phase->igvn().register_new_node_with_optimizer(b);
+  phase->igvn().register_new_node_with_optimizer(con);
+
+  return con;
+}
+
+// NOTE: move to IdealLoopTree / loopTransform.cpp?
+bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedLoopNode *cl) {
+  bool VERBOSE = true;
+  const juint VEC_SIZE = 4;
+
   Node *induction_phi = cl->phi();
   if (induction_phi == NULL) return false;
+  if (VERBOSE) tty->print_cr("Found induction phi N%d", induction_phi->_idx);
 
   // PHI holding the current value of the `h`.
   PhiNode *reduction_phi = find_reduction_phi(cl);
   if (reduction_phi == NULL) return false;
+  if (VERBOSE) tty->print_cr("Found reduction phi N%d", reduction_phi->_idx);
   // ADD adding the result of the current iteration to `h`
-  AddNode *acc_add = find_acc_add(reduction_phi);
-  if (acc_add == NULL) return false;
+  // AddNode *acc_add = find_rhs(reduction_phi);
+  // if (acc_add == NULL) return false;
+  // if (VERBOSE) tty->print_cr("Found acc_add N%d", acc_add->_idx);
+
   // Right hand side of the assignment.
-  Node *rhs = find_rhs(acc_add, reduction_phi);
+  Node *rhs = find_rhs(reduction_phi); //find_rhs(acc_add, reduction_phi);
   if (rhs == NULL) return false;
+  tty->print_cr("Found right-hand-side N%d", rhs->_idx);
 
   ConMul con_mul;
   ArrayRead array_read;
@@ -472,53 +525,74 @@ bool build_stuff(Compile *C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedL
   bool ok1 = match_con_mul(rhs->in(1), reduction_phi, con_mul);
   bool ok2 = match_array_read(rhs->in(2), induction_phi, array_read);
 
-  tty->print("Matched CountedLoop %d\n", cl->_idx);
-  if (ok1) {
-    tty->print("  Reduction variable multiplier by: %d\n", con_mul.multiplier);
-  }
-  if (ok2) {
-    tty->print("  Array read: i%d %d[%d]\n", array_read._elem_byte_size * 8,
-              array_read._array_ptr->_idx, array_read._index->_idx);
-    //tty->print_cr("basic_type; %d", TypeInt::make(1337)->basic_type());
+  if (!ok1 || !ok2) return false;
 
-  }
+  tty->print_cr("APPLYING TRANSFORMATION!");
 
-  if (ok1 && ok2 && cl->_idx == 167) {
-    // set_stride(cl, phase, 4);
-    tty->print_cr("cl->stride() = %d", cl->stride()->_idx);
+  // Build post-loop for the remaining iterations that does not fill
+  // up a full vector.
+  CountedLoopNode* post_head;
+  Node_List old_new;
+  phase->insert_post_loop(lpt, old_new, cl, cl->loopexit(),
+                          cl->incr(), cl->limit(), post_head);
 
-    uint vector_size = 4 * 4; // 4 4byte ints
-    if (C->max_vector_size() < vector_size) {
-      C->set_max_vector_size(vector_size);
-    }
+  // Adjust main loop stride and limit.
+  set_stride(cl, phase, VEC_SIZE);
+  adjust_limit_to_vec_size(cl, phase, VEC_SIZE);
 
-    Node *out_phi = cl->find(155);
-    assert(out_phi->isa_Phi(), "a phi");
+  tty->print_cr("cl->stride() = %d", cl->stride()->_idx);
 
-    //ConNode *n = ConNode::make(TypeInt::make(42));
-    //Node *vector = VectorNode::scalar2vector(n, 4, TypeInt::INT);
-
-    Node *base_off = ConNode::make(TypeLong::make(array_read._base_offset));
-    Node *off_array_ptr = new AddPNode(array_read._array_ptr, array_read._array_ptr, base_off); // Array ptr + base offset
-
-    Node *addr = array_read._load->in(LoadNode::Address);
-    Node *vector = LoadVectorNode::make(array_read._load->Opcode(), NULL, array_read._memory,
-                                        off_array_ptr, array_read._load->adr_type(), 4, T_INT);
-    ConNode *reduce_base = ConNode::make(TypeInt::make(0));
-    Node *reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, vector, T_INT);
-
-    Node *ctrl = out_phi->find(53); // Return region.
-
-    // phase->register_new_node(base_off, out_phi->in(PhiNode::Region));
-    // phase->register_new_node(off_array_ptr, out_phi->in(PhiNode::Region));
-    // phase->register_new_node(vector, out_phi->in(PhiNode::Region));
-    // phase->register_new_node(reduce_base, out_phi->in(PhiNode::Region));
-    // phase->register_new_node(reduce, out_phi->in(PhiNode::Region));
-
-    // phase->igvn().replace_node(out_phi, reduce);
+  const uint VECTOR_BYTE_SIZE = VEC_SIZE * 4; // 4 4byte ints
+  if (C->max_vector_size() < VECTOR_BYTE_SIZE) {
+    C->set_max_vector_size(VECTOR_BYTE_SIZE);
   }
 
-  return ok1 && ok2 && cl->_idx == 167;
+  // Node *out_phi = cl->find(155);
+  // assert(out_phi->isa_Phi(), "a phi");
+
+  // Constant multiplier
+  Node *mulv = make_vector(phase, pow(con_mul.multiplier, VEC_SIZE), VEC_SIZE);
+
+  Node *base_off = ConNode::make(TypeLong::make(array_read._base_offset));
+  Node *off_array_ptr = new AddPNode(array_read._array_ptr, array_read._array_ptr, base_off); // Array ptr + base offset
+
+  Node *load_addr = array_read._load->in(LoadNode::Address);
+  Node *load_ctrl = array_read._load->in(LoadNode::Control);
+
+  Node *arr = LoadVectorNode::make(array_read._load->Opcode(), load_ctrl, array_read._memory,
+                                      load_addr, array_read._load->adr_type(), 4, T_INT);
+
+  Node *initial_acc = make_vector(phase, 0, VEC_SIZE);
+  Node *m = make_exp_vector(phase, 31, VEC_SIZE);
+
+  Node *phi = PhiNode::make(reduction_phi->in(PhiNode::Region), initial_acc);
+  phase->igvn().register_new_node_with_optimizer(phi);
+
+  Node *mul0 = new MulVINode(mulv, phi, TypeVect::make(T_INT, VEC_SIZE));
+  phase->igvn().register_new_node_with_optimizer(mul0);
+  Node *mul1 = new MulVINode(arr, m, TypeVect::make(T_INT, VEC_SIZE));
+  phase->igvn().register_new_node_with_optimizer(mul1);
+
+  Node *add = new AddVINode(mul0, mul1, TypeVect::make(T_INT, VEC_SIZE));
+  phase->igvn().register_new_node_with_optimizer(add);
+
+  phi->set_req(2, add);
+
+  // Replace with initial reduction phi value:
+  ConNode *reduce_base = ConNode::make(TypeInt::make(0));
+  Node *reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, phi, T_INT);
+
+
+  phase->igvn().register_new_node_with_optimizer(base_off, NULL);
+  phase->igvn().register_new_node_with_optimizer(off_array_ptr, NULL);
+  phase->igvn().register_new_node_with_optimizer(arr, NULL);
+  phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
+  phase->igvn().register_new_node_with_optimizer(reduce, NULL);
+
+  phase->igvn().replace_node(rhs, reduce); // Replace right hand side with reduction.
+  // phase->igvn().replace_input_of(acc_add, 2, reduce);
+
+  return true;
   // tty->print("Patternmatching *32: %d\n", match_con_mul(rhs->in(1), reduction_phi, con_mul));
   // tty->print("Patternmatching a[i]: %d\n", match_array_read(rhs->in(2), reduction_phi, array_read));
 
@@ -531,18 +605,17 @@ bool build_stuff(Compile *C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedL
 }
 
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
-  //if (!SuperWordPolynomial) return true;
+  if (!SuperWordPolynomial) return true;
 
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
-  if (!cl->stride_is_con() || cl->is_polynomial_reduction()) return false;
+  if (!cl->stride_is_con() || cl->is_polynomial_reduction() ||
+      !cl->is_normal_loop()) return false;
 
-  if (build_stuff(C, phase, igvn, cl)) {
+  if (build_stuff(C, lpt, phase, igvn, cl)) {
     cl->mark_polynomial_reduction();
     return true;
   }
-
-  tty->print_cr("SuperWordPolynomial? %d", SuperWordPolynomial);
 
   return false;
 

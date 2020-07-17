@@ -578,6 +578,7 @@ nmethod* nmethod::new_nmethod(const methodHandle& method,
     DEBUG_ONLY(nm->verify();)
     nm->log_new_nmethod();
   }
+
   return nm;
 }
 

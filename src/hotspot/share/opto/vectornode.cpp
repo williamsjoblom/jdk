@@ -467,6 +467,17 @@ VectorNode* VectorNode::scalar2vector(Node* s, uint vlen, const Type* opd_t) {
   }
 }
 
+// Scalar promotion
+VectorNode* VectorNode::scalars2vector(Node *n1, Node *n2) {
+  // BasicType bt = opd_t->array_element_basic_type();
+  // const TypeVect* vt = opd_t->singleton() ? TypeVect::make(opd_t, 4)
+  //                                         : TypeVect::make(bt, 4);
+
+  // assert(bt == T_INT, "not implemented");
+  return new ConV4INode(n1, n2, TypeVect::make(T_INT, 4));
+}
+
+
 VectorNode* VectorNode::shift_count(Node* shift, Node* cnt, uint vlen, BasicType bt) {
   assert(VectorNode::is_shift(shift), "sanity");
   // Match shift count type with shift vector type.
@@ -573,6 +584,8 @@ PackNode* PackNode::make(Node* s, uint vlen, BasicType bt) {
     fatal("Type '%s' is not supported for vectors", type2name(bt));
     return NULL;
   }
+
+
 }
 
 // Create a binary tree form for Packs. [lo, hi) (half-open) range
@@ -783,4 +796,3 @@ MacroLogicVNode* MacroLogicVNode::make(PhaseGVN& gvn, Node* in1, Node* in2, Node
   Node* fn = gvn.intcon(truth_table);
   return new MacroLogicVNode(in1, in2, in3, fn, vt);
 }
-

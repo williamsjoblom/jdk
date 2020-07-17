@@ -34,10 +34,15 @@
 class VectorNode : public TypeNode {
  public:
 
+  VectorNode(const TypeVect* vt) : TypeNode(vt, 1) {
+    init_class_id(Class_Vector);
+  }
+
   VectorNode(Node* n1, const TypeVect* vt) : TypeNode(vt, 2) {
     init_class_id(Class_Vector);
     init_req(1, n1);
   }
+
   VectorNode(Node* n1, Node* n2, const TypeVect* vt) : TypeNode(vt, 3) {
     init_class_id(Class_Vector);
     init_req(1, n1);
@@ -68,6 +73,7 @@ class VectorNode : public TypeNode {
   virtual uint ideal_reg() const { return Matcher::vector_ideal_reg(vect_type()->length_in_bytes()); }
 
   static VectorNode* scalar2vector(Node* s, uint vlen, const Type* opd_t);
+  static VectorNode* scalars2vector(Node *n1, Node *n2);
   static VectorNode* shift_count(Node* shift, Node* cnt, uint vlen, BasicType bt);
   static VectorNode* make(int opc, Node* n1, Node* n2, uint vlen, BasicType bt);
   static VectorNode* make(int opc, Node* n1, Node* n2, Node* n3, uint vlen, BasicType bt);
@@ -791,6 +797,19 @@ class ReplicateFNode : public VectorNode {
 class ReplicateDNode : public VectorNode {
  public:
   ReplicateDNode(Node* in1, const TypeVect* vt) : VectorNode(in1, vt) {}
+  virtual int Opcode() const;
+};
+
+//========================Load_Vector_With_Scalars===========================
+
+//------------------------------ReplicateINode---------------------------------
+// Replicate 4 int scalar to be vector
+class ConV4INode : public VectorNode {
+ public:
+  ConV4INode(Node *n1, Node *n2, const TypeVect *vt)
+    : VectorNode(n1, n2, vt) {
+    init_req(0, (Node*)Compile::current()->root());
+  }
   virtual int Opcode() const;
 };
 

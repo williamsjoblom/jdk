@@ -3282,6 +3282,19 @@ instruct storeV(memory mem, vec src) %{
   ins_pipe( pipe_slow );
 %}
 
+instruct ConV4I_imm(vec dst, immL lo, immL hi) %{
+  match(Set dst (ConV4I lo hi));
+  format %{ "ConV4I $dst" %}
+  ins_encode %{
+    // TODO: The following address may not be aligned (seems to work tho):
+    InternalAddress lo_addr = $constantaddress($hi$$constant, $lo$$constant);
+    __ movdqu($dst$$XMMRegister, lo_addr);
+    //__ movq($dst$$XMMRegister, lo_addr);
+    //__ punpcklqdq($dst$$XMMRegister, $dst$$XMMRegister);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
 // ====================REPLICATE=======================================
 
 // Replicate byte scalar to be vector

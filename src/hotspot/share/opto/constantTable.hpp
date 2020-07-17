@@ -133,6 +133,15 @@ public:
     jvalue value; value.j = j;
     return add(n, T_LONG, value);
   }
+
+  Constant add(MachConstantNode* n, jlong x, jlong y) {
+    jvalue xvalue; xvalue.j = x;
+    jvalue yvalue; yvalue.j = y;
+    Constant cx = add(n, T_LONG, xvalue);
+    Constant cy = add(n, T_LONG, yvalue);
+    return cx;
+  }
+
   Constant add(MachConstantNode* n, jfloat f) {
     jvalue value; value.f = f;
     return add(n, T_FLOAT, value);

@@ -4041,6 +4041,7 @@ int MatchRule::is_expensive() const {
         strcmp(opType,"ReplicateL")==0 ||
         strcmp(opType,"ReplicateF")==0 ||
         strcmp(opType,"ReplicateD")==0 ||
+        strcmp(opType,"ConV4I")==0 ||
         strcmp(opType,"AddReductionVI")==0 ||
         strcmp(opType,"AddReductionVL")==0 ||
         strcmp(opType,"AddReductionVF")==0 ||
@@ -4165,7 +4166,7 @@ bool MatchRule::is_vector() const {
     "URShiftVB","URShiftVS","URShiftVI","URShiftVL",
     "ReplicateB","ReplicateS","ReplicateI","ReplicateL","ReplicateF","ReplicateD",
     "RoundDoubleModeV","LoadVector","StoreVector",
-    "FmaVD", "FmaVF","PopCountVI",
+    "FmaVD", "FmaVF","PopCountVI", "ConV4I",
     // Next are not supported currently.
     "PackB","PackS","PackI","PackL","PackF","PackD","Pack2L","Pack2D",
     "ExtractB","ExtractUB","ExtractC","ExtractS","ExtractI","ExtractL","ExtractF","ExtractD"
