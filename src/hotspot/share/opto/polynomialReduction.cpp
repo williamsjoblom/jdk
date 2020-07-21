@@ -304,7 +304,6 @@ struct ConMul {
 bool match_con_mul(Node *start, Node *of, ConMul &result) {
   enum {
     SHIFT_DISTANCE,
-
     N_REFS
   };
 
@@ -449,17 +448,18 @@ void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
 }
 
 void adjust_limit_to_vec_size(CountedLoopNode *cl, PhaseIdealLoop *phase, jint vec_size) {
+  // WARNING: (limit - stride) may underflow!!!
   const uint LIMIT = 2;
   Node *cmp = cl->loopexit()->cmp_node();
   assert(cmp != NULL && cmp->req() == 3, "no loop limit found");
   Node *limit = cmp->in(LIMIT);
 
-  Node *neg_vec_size = ConNode::make(TypeInt::make(-vec_size));
-  Node *adjusted_limit = new AddINode(limit, neg_vec_size);
+  Node *new_stride = ConNode::make(TypeInt::make(vec_size));
+  Node *adjusted_limit = new SubINode(limit, new_stride);
 
   assert(adjusted_limit != NULL, "adj limit");
 
-  phase->igvn().register_new_node_with_optimizer(neg_vec_size);
+  phase->igvn().register_new_node_with_optimizer(new_stride);
   phase->igvn().register_new_node_with_optimizer(adjusted_limit);
 
   phase->igvn().replace_input_of(cmp, LIMIT, adjusted_limit);
@@ -486,8 +486,8 @@ VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size) {
 VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vec_size) {
   assert(vec_size == 4, "not implemented");
 
-  ConNode *a = ConNode::make(TypeLong::make(((long)(n*n*n) << 32) | n*n));
-  ConNode *b = ConNode::make(TypeLong::make(((long)(n) << 32) | 1));
+  ConNode *b = ConNode::make(TypeLong::make(((n*n*n) ) | ((long)n*n << 32)));
+  ConNode *a = ConNode::make(TypeLong::make(n | ((long)1 << 32)));
   VectorNode *con = VectorNode::scalars2vector(a, b);
   phase->igvn().register_new_node_with_optimizer(a);
   phase->igvn().register_new_node_with_optimizer(b);
@@ -527,10 +527,15 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   if (!ok1 || !ok2) return false;
 
-  tty->print_cr("APPLYING TRANSFORMATION!");
+  tty->print_cr("APPLYING TRANSFORMATION! m = %d", con_mul.multiplier);
 
   // Build post-loop for the remaining iterations that does not fill
   // up a full vector.
+  // Node *one = ConINode::make(1);
+  // Node *post_init_trip = new AddINode(cl->phi(), one);
+  // phase->igvn().register_new_node_with_optimizer(one);
+  // phase->igvn().register_new_node_with_optimizer(post_init_trip);
+
   CountedLoopNode* post_head;
   Node_List old_new;
   phase->insert_post_loop(lpt, old_new, cl, cl->loopexit(),
@@ -539,6 +544,7 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // Adjust main loop stride and limit.
   set_stride(cl, phase, VEC_SIZE);
   adjust_limit_to_vec_size(cl, phase, VEC_SIZE);
+  // post_head->phi()->set_req(1, cl->phi());
 
   tty->print_cr("cl->stride() = %d", cl->stride()->_idx);
 
@@ -546,6 +552,8 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   if (C->max_vector_size() < VECTOR_BYTE_SIZE) {
     C->set_max_vector_size(VECTOR_BYTE_SIZE);
   }
+
+
 
   // Node *out_phi = cl->find(155);
   // assert(out_phi->isa_Phi(), "a phi");
@@ -560,12 +568,13 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   Node *load_ctrl = array_read._load->in(LoadNode::Control);
 
   Node *arr = LoadVectorNode::make(array_read._load->Opcode(), load_ctrl, array_read._memory,
-                                      load_addr, array_read._load->adr_type(), 4, T_INT);
+                                   load_addr, array_read._load->adr_type(), 4, T_INT);
 
   Node *initial_acc = make_vector(phase, 0, VEC_SIZE);
-  Node *m = make_exp_vector(phase, 31, VEC_SIZE);
+  Node *m = make_exp_vector(phase, con_mul.multiplier, VEC_SIZE);
 
-  Node *phi = PhiNode::make(reduction_phi->in(PhiNode::Region), initial_acc);
+  // NOTE: WAS reduction_phi->in(PhiNode::Region)
+  Node *phi = PhiNode::make(induction_phi->in(PhiNode::Region), initial_acc);
   phase->igvn().register_new_node_with_optimizer(phi);
 
   Node *mul0 = new MulVINode(mulv, phi, TypeVect::make(T_INT, VEC_SIZE));
@@ -580,8 +589,7 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   // Replace with initial reduction phi value:
   ConNode *reduce_base = ConNode::make(TypeInt::make(0));
-  Node *reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, phi, T_INT);
-
+  Node *reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, add, T_INT);
 
   phase->igvn().register_new_node_with_optimizer(base_off, NULL);
   phase->igvn().register_new_node_with_optimizer(off_array_ptr, NULL);
