@@ -474,9 +474,13 @@ VectorNode* VectorNode::scalars2vector(Node *n1, Node *n2) {
   //                                         : TypeVect::make(bt, 4);
 
   // assert(bt == T_INT, "not implemented");
-  return new ConV4INode(n1, n2, TypeVect::make(T_INT, 4));
+  if (n1->Opcode() == Op_ConV4I && n2->Opcode() == Op_ConV4I) {
+    return new ConV8INode(n1, n2, TypeVect::make(T_INT, 8));
+  } else {
+    assert(n1->Opcode() == Op_ConL && n2->Opcode() == Op_ConL, "expected");
+    return new ConV4INode(n1, n2, TypeVect::make(T_INT, 4));
+  }
 }
-
 
 VectorNode* VectorNode::shift_count(Node* shift, Node* cnt, uint vlen, BasicType bt) {
   assert(VectorNode::is_shift(shift), "sanity");
@@ -632,6 +636,15 @@ LoadVectorNode* LoadVectorNode::make(int opc, Node* ctl, Node* mem,
                                      ControlDependency control_dependency) {
   const TypeVect* vt = TypeVect::make(bt, vlen);
   return new LoadVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
+}
+
+// Return the vector version of a scalar load node.
+ShortLoadVectorNode* ShortLoadVectorNode::make(int opc, Node* ctl, Node* mem,
+                                               Node* adr, const TypePtr* atyp,
+                                               uint vlen, BasicType bt,
+                                               ControlDependency control_dependency) {
+  const TypeVect* vt = TypeVect::make(bt, vlen);
+  return new ShortLoadVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
 }
 
 // Return the vector version of a scalar store node.

@@ -1777,6 +1777,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_c2_type(AddVDNode, VectorNode)                                  \
   declare_c2_type(AddReductionVDNode, ReductionNode)                      \
   declare_c2_type(ConV4INode, VectorNode)                                 \
+  declare_c2_type(ConV8INode, VectorNode)                                 \
   declare_c2_type(SubVBNode, VectorNode)                                  \
   declare_c2_type(SubVSNode, VectorNode)                                  \
   declare_c2_type(SubVINode, VectorNode)                                  \
@@ -1825,6 +1826,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_c2_type(MaxReductionVNode, ReductionNode)                       \
   declare_c2_type(MinReductionVNode, ReductionNode)                       \
   declare_c2_type(LoadVectorNode, LoadNode)                               \
+  declare_c2_type(ShortLoadVectorNode, LoadVectorNode)                    \
   declare_c2_type(StoreVectorNode, StoreNode)                             \
   declare_c2_type(ReplicateBNode, VectorNode)                             \
   declare_c2_type(ReplicateSNode, VectorNode)                             \

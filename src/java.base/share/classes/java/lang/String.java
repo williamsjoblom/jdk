@@ -3674,10 +3674,14 @@ public final class String
     }
 
     byte[] value() {
-        return value;
+      return value;
     }
 
-    boolean isLatin1() {
+  /**
+   * Lol xd
+   * @return some things
+   */
+    public boolean isLatin1() {
         return COMPACT_STRINGS && coder == LATIN1;
     }
 

@@ -141,13 +141,25 @@ public:
     jvalue value; value.j = j;
     return add(n, T_LONG, value);
   }
-  Constant add(MachConstantNode* n, jlong x, jlong y) {
+  Constant add(MachConstantNode* n, jlong a, jlong b) {
     // Double quadword with 16 byte alignment.
-    jvalue xvalue; xvalue.j = x;
-    jvalue yvalue; yvalue.j = y;
-    Constant cx = add(n, T_LONG, xvalue, 16);
-    Constant cy = add(n, T_LONG, yvalue);
-    return cx;
+    jvalue avalue; avalue.j = a;
+    jvalue bvalue; bvalue.j = b;
+    Constant ca = add(n, T_LONG, avalue, 16);
+    Constant cb = add(n, T_LONG, bvalue);
+    return ca;
+  }
+  Constant add(MachConstantNode *n, jlong a, jlong b, jlong c, jlong d) {
+    // Quad quadword with 32 byte alignment.
+    jvalue avalue; avalue.j = a;
+    jvalue bvalue; bvalue.j = b;
+    jvalue cvalue; cvalue.j = c;
+    jvalue dvalue; dvalue.j = d;
+    Constant ca = add(n, T_LONG, avalue, 32);
+    Constant cb = add(n, T_LONG, bvalue);
+    Constant cc = add(n, T_LONG, cvalue);
+    Constant cd = add(n, T_LONG, dvalue);
+    return ca;
   }
   Constant add(MachConstantNode* n, jfloat f) {
     jvalue value; value.f = f;

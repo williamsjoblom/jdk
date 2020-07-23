@@ -3264,6 +3264,20 @@ instruct loadV(vec dst, memory mem) %{
   ins_pipe( pipe_slow );
 %}
 
+instruct loadShortV(vec dst, memory mem) %{
+  // Assumes $dst is 256 bit int vector.
+  // predicate(tty->print_cr("%s", type2name(n->as_Load()->memory_type())), true);
+  match(Set dst (ShortLoadVector mem));
+  format %{ "load_short_vector $dst, $mem" %}
+  ins_encode %{
+    switch (vector_length(this)) { // TODO: change to vector_length_in_bytes()
+      case 8: __ vpmovzxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+      default: tty->print_cr("%d", vector_length(this));ShouldNotReachHere();
+    }
+  %}
+  ins_pipe(pipe_slow);
+%}
+
 // Store vectors generic operand pattern.
 instruct storeV(memory mem, vec src) %{
   match(Set mem (StoreVector mem src));
@@ -3282,15 +3296,30 @@ instruct storeV(memory mem, vec src) %{
   ins_pipe( pipe_slow );
 %}
 
+// ====================VECTOR CONSTANTS================================
+
+instruct ConV8I_imm(vec dst, immL a, immL b, immL c, immL d) %{
+  match(Set dst (ConV8I (ConV4I a b) (ConV4I c d)));
+  format %{ "ConV8I $dst" %}
+  ins_encode %{
+    uint vlen = vector_length(this);
+    assert(vlen == 8, "required");
+    InternalAddress lo_addr = $constantaddress($a$$constant, $b$$constant, $c$$constant, $d$$constant);
+    // Aligned load. Asserts that lo_addr is aligned.
+    __ vmovdqu($dst$$XMMRegister, lo_addr);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
 instruct ConV4I_imm(vec dst, immL lo, immL hi) %{
   match(Set dst (ConV4I lo hi));
   format %{ "ConV4I $dst" %}
   ins_encode %{
-    // TODO: The following address may not be aligned (seems to work tho):
+    uint vlen = vector_length(this);
+    assert(vlen == 4, "required");
     InternalAddress lo_addr = $constantaddress($hi$$constant, $lo$$constant);
-    __ movdqu($dst$$XMMRegister, lo_addr);
-    //__ movq($dst$$XMMRegister, lo_addr);
-    //__ punpcklqdq($dst$$XMMRegister, $dst$$XMMRegister);
+    // Aligned load. Asserts that lo_addr is aligned.
+    __ movdqa($dst$$XMMRegister, lo_addr);
   %}
   ins_pipe( pipe_slow );
 %}

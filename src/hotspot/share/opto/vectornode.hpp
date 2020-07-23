@@ -722,6 +722,21 @@ class LoadVectorNode : public LoadNode {
   uint element_size(void) { return type2aelembytes(vect_type()->element_basic_type()); }
 };
 
+class ShortLoadVectorNode : public LoadVectorNode {
+public:
+  ShortLoadVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt, ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
+    : LoadVectorNode(c, mem, adr, at, vt, control_dependency) { }
+
+  virtual int Opcode() const;
+
+  virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
+
+  static ShortLoadVectorNode *make(int opc, Node* ctl, Node* mem,
+                                   Node* adr, const TypePtr* atyp,
+                                   uint vlen, BasicType bt,
+                                   ControlDependency control_dependency = LoadNode::DependsOnlyOnTest);
+};
+
 //------------------------------StoreVectorNode--------------------------------
 // Store Vector to memory
 class StoreVectorNode : public StoreNode {
@@ -803,11 +818,20 @@ class ReplicateDNode : public VectorNode {
 //========================Load_Vector_With_Scalars===========================
 
 //------------------------------ReplicateINode---------------------------------
-// Replicate 4 int scalar to be vector
+// Replicate 2 long scalar to be vector
 class ConV4INode : public VectorNode {
  public:
   ConV4INode(Node *n1, Node *n2, const TypeVect *vt)
     : VectorNode(n1, n2, vt) {
+    init_req(0, (Node*)Compile::current()->root());
+  }
+  virtual int Opcode() const;
+};
+
+class ConV8INode : public VectorNode {
+public:
+  ConV8INode(Node *n1, Node *n2, const TypeVect *vt)
+      : VectorNode(n1, n2, vt) {
     init_req(0, (Node*)Compile::current()->root());
   }
   virtual int Opcode() const;
@@ -818,7 +842,7 @@ class ConV4INode : public VectorNode {
 //------------------------------PackNode---------------------------------------
 // Pack parent class (not for code generation).
 class PackNode : public VectorNode {
- public:
+public:
   PackNode(Node* in1, const TypeVect* vt) : VectorNode(in1, vt) {}
   PackNode(Node* in1, Node* n2, const TypeVect* vt) : VectorNode(in1, n2, vt) {}
   virtual int Opcode() const;
