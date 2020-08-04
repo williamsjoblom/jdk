@@ -10,6 +10,8 @@
 #include "opto/vectornode.hpp"
 #include "opto/callnode.hpp"
 #include "opto/output.hpp"
+#include "utilities/powerOfTwo.hpp"
+#include "opto/opaquenode.hpp"
 
 const uint MAX_SEARCH_DEPTH = 20;
 
@@ -119,7 +121,7 @@ AddNode *find_rhs(PhiNode *reduction_phi) {
 // //
 // // Ex. h = 31*h + a[i];
 // //         ^
-// //         | this is the right hand side.
+// //         | right hand side.
 // Node *find_rhs(AddNode *acc_add, Node* lhs) {
 //   for (uint i = 0; i < acc_add->req(); i++) {
 //     Node *in = acc_add->in(i);
@@ -433,30 +435,87 @@ struct ConMul {
   jint multiplier;
 };
 
-// Match multiplication of `of`*constant.
-bool match_con_mul(Node *start, Node *of, ConMul &result) {
+bool match_shift_con_mul(Node *start, Node *of, ConMul &result) {
   enum {
     SHIFT_DISTANCE,
+    SUB,
+    ADD,
     N_REFS
   };
 
-  MatchRefs refs(N_REFS);
-  Pattern *p = new OpcodePattern<3>
+  Pattern *l_shift = new OpcodePattern<3>
+    (Op_LShiftI,
+     ANY,
+     new ExactNodePattern(of),
+     new OpcodePattern<0>(Op_ConI, SHIFT_DISTANCE));
+
+  Pattern *shift_sub = new OpcodePattern<3>
     (Op_SubI,
      ANY,
-     new OpcodePattern<3>
-     (Op_LShiftI,
-      ANY,
-      new ExactNodePattern(of),
-      new OpcodePattern<0>(Op_ConI, SHIFT_DISTANCE)),
-     new ExactNodePattern(of));
+     l_shift,
+     new ExactNodePattern(of),
+     SUB);
 
-  if (p->match(start, refs)) {
-    result.multiplier = (1 << refs[SHIFT_DISTANCE]->get_int()) - 1;
+  Pattern *shift_add = new OpcodePattern<3>
+    (Op_AddI,
+     ANY,
+     l_shift,
+     new ExactNodePattern(of),
+     ADD);
+
+  Pattern *shift = new OrPattern(shift_sub, new OrPattern(shift_add, l_shift));
+
+  MatchRefs refs(N_REFS);
+  if (shift->match(start, refs)) {
+    result.multiplier = (1 << refs[SHIFT_DISTANCE]->get_int());
+    if (refs[SUB]) {
+      result.multiplier--;
+    } else if (refs[ADD]) {
+      result.multiplier++;
+    }
+
     return true;
   } else {
     return false;
   }
+}
+
+bool match_trivial_con_mul(Node *start, Node *of, ConMul &result) {
+  enum {
+    MUL,
+    N_REFS
+  };
+
+  Pattern *mul = new OpcodePattern<3>
+    (Op_MulI,
+     ANY,
+     new ExactNodePattern(of),
+     new OpcodePattern<0>(Op_ConI, MUL));
+
+  MatchRefs refs(N_REFS);
+  if (mul->match(start, refs)) {
+    result.multiplier = refs[MUL]->get_int();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool match_identity_con_mul(Node *start, Node *of, ConMul &result) {
+  if (start == of) {
+    result.multiplier = 1;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+// Match multiplication of `of`*constant.
+bool match_con_mul(Node *start, Node *of, ConMul &result) {
+  return
+    match_identity_con_mul(start, of, result) ||
+    match_shift_con_mul(start, of, result) ||
+    match_trivial_con_mul(start, of, result);
 }
 
 bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
@@ -528,28 +587,6 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
   }
 }
 
-// Does the given node `n` multiply `x` by 31?
-//
-// This operation tend to appear on the form:
-// (x << 5) - x
-// [= x*32 - x = x*31]
-//
-// (Sub
-//   (LShiftI x (ConI))
-//   x
-// )
-bool is_x_mul_31(Node *n, Node* x) {
-  if (!n->is_Sub()) return false;
-
-  Node *lshift = n->in(1); // The first input operand of n.
-  return
-    n->in(2) == x &&
-    lshift->Opcode() == Op_LShiftI &&
-    lshift->in(1) == x &&
-    lshift->in(2)->Opcode() == Op_ConI &&
-    lshift->in(2)->get_int() == 5;
-}
-
 // Does one of the incoming edges of `phi` depend on its outgoing
 // edge?
 bool is_self_dependent(PhiNode *phi) {
@@ -582,14 +619,26 @@ GrowableArray<InductionArrayRead> get_array_access_chains(Node *phi) {
 /****************************************************************
  * Main-loop patching
  ****************************************************************/
+void patch_min_trip(CountedLoopNode *cl, PhaseIdealLoop *phase,
+                    jint new_stride) {
+}
+
 void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
   assert(cl->stride_is_con(), "setting stride for non const stride loop");
+
+  if (!phase->is_canonical_loop_entry(cl)) {
+    tty->print_cr("Non canonical loop entry!");
+  }
+
+  //assert(opaq->outcnt() == 1 && opaq->in(1) == cl->limit(), "sanity");
+  //opaq->dump("Opaq: ");
 
   ConNode *stride = ConNode::make(TypeInt::make(new_stride));
   phase->igvn().register_new_node_with_optimizer(stride);
 
   Node *incr = cl->incr();
   if (incr != NULL && incr->req() == 3) {
+    //phase->igvn().replace_node(cl->stride(), stride);
     phase->igvn().replace_input_of(incr, 2, stride);
   } else {
     ShouldNotReachHere();
@@ -614,12 +663,6 @@ void adjust_limit_to_vec_size(CountedLoopNode *cl, PhaseIdealLoop *phase, jint v
   phase->igvn().replace_input_of(cmp, LIMIT, adjusted_limit);
 }
 
-// Is `cl` a polynomial reduction?
-bool is_polynomial_reduction(CountedLoopNode *cl) {
-  PhiNode *reduction_phi = find_reduction_phi(cl);
-  return reduction_phi != NULL && is_self_dependent(reduction_phi);
-}
-
 // Make int vector containing [init, init, ..., init]
 VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size) {
   ConNode *init_con = ConNode::make(TypeInt::make(init));
@@ -635,6 +678,15 @@ VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size) {
 VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vec_size) {
   assert(vec_size == 4 || vec_size == 8, "expected");
 
+  if (0 <= n && n <= 1) {
+    // [0^3, 0^2, 0^1, 0^0] = [0, 0, 0, 0] and
+    // [1^3, 1^2, 1^1, 1^0] = [1, 1, 1, 1]
+    return make_vector(phase, n, vec_size);
+  }
+
+  // TODO: The following code need to be modified to support
+  // big-endian systems, fixed by adjusting shift distances depending
+  // on target endianness.
   if (vec_size == 4) {
     ConNode *b = ConNode::make(TypeLong::make(((n * n * n)) | ((long)n * n << 32)));
     ConNode *a = ConNode::make(TypeLong::make(n | ((long)1 << 32)));
@@ -708,10 +760,126 @@ Node *build_array_load(PhaseIdealLoop *phase, ArrayRead& array_read, uint vlen) 
   return NULL;
 }
 
+
+
+CountedLoopEndNode *find_pre_loop_end(CountedLoopNode *main) {
+  Node *pre_false = main->skip_predicates()->in(0)->in(0);
+  assert(pre_false->is_IfFalse(), "sanity");
+  Node *pre_end = pre_false->in(0);
+  assert(pre_end->is_CountedLoopEnd(), "sanity");
+  return pre_end->as_CountedLoopEnd();
+}
+
+CountedLoopNode *find_pre_loop(CountedLoopNode *main) {
+  CountedLoopEndNode *pre_loop_end = find_pre_loop_end(main);
+  CountedLoopNode *pre_loop = pre_loop_end->loopnode()->as_CountedLoop();
+  assert(pre_loop->is_pre_loop(), "sanity");
+  return pre_loop;
+}
+
+CmpNode *zero_trip_test(CountedLoopNode *loop) {
+  return cl->skip_predicates()->in(0)->in(1)->in(1)->as_Cmp();
+}
+
+void add_main_loop_range_check(IdealLoopTree *lpt, PhaseIdealLoop *phase,
+                               CountedLoopNode *cl, ArrayRead &read) {
+  // Node *adr_off = phase->igvn().longcon(arrayOopDesc::length_offset_in_bytes());
+  // Node *r_adr = phase->igvn().transform(new AddPNode(read._load->in(LoadNode::Address),
+  //                                                    read._load->in(LoadNode::Address),
+  //                                                    adr_off));
+  // Node *len = phase->igvn().transform(new LoadRangeNode(0, read._memory, r_adr, TypeInt::POS));
+
+  // Node* strip_mined = cl->skip_strip_mined();
+  // Node* predicate_proj = strip_mined->in(LoopNode::EntryControl);
+
+  // Node *vlen = phase->igvn().intcon(8);
+  // ProjNode *proj = phase->insert_if_before_proj(len, false, BoolTest::le, vlen, predicate_proj->as_Proj());
+  // proj->in(0)->dump("  Proj->in[0]");
+  // proj->dump(" Proj\n");
+
+
+  // Node *initial_iv = phase->igvn().intcon(0);
+  // Node *initial_rv = phase->igvn().intcon(0);
+
+  // RegionNode *region = phase->insert_region_before_proj(post_head->in(LoopNode::EntryControl)->as_Proj());
+  // region->add_req(proj);
+  // region->dump(" region before projection\n");
+
+  // Node *iv = post_head->phi();
+  // Node *rv = find_reduction_phi(post_head);
+
+  // PhiNode *iv_phi = PhiNode::make(region, iv->in(1));
+  // iv_phi->set_req(2, initial_iv);
+  // phase->igvn().register_new_node_with_optimizer(iv_phi);
+  // PhiNode *rv_phi = PhiNode::make(region, rv->in(1));
+  // rv_phi->set_req(2, initial_rv);
+  // phase->igvn().register_new_node_with_optimizer(rv_phi);
+
+  // phase->igvn().replace_input_of(iv, 1, iv_phi);
+  // phase->igvn().replace_input_of(rv, 1, rv_phi);
+
+  // iv->dump(" induction variable\n");
+  // iv_phi->dump(" induction phi\n");
+  // rv->dump(" recurrence variable\n");
+  // rv_phi->dump(" recurrence phi");
+
+  // lpt->record_for_igvn();
+
+
+  // // NOTE: New implementation
+  // Node *main_loop = cl->skip_strip_mined();
+  // Node *main_entry = main_loop->in(LoopNode::EntryControl);
+  // int dd_main_entry = phase->dom_depth(main_entry);
+
+
+  // // Build zero trip guard for main loop.
+  // Node *zer_opaq = new Opaque1Node(phase->C, phase->intcon(8));
+  // Node *zer_cmp = new CmpINode(zer_opaq, cl->limit());
+  // Node *zer_bol = new BoolNode(zer_cmp, cl->loopexit()->test_trip());
+  // phase->igvn().register_new_node_with_optimizer(zer_opaq, main_entry);
+  // phase->igvn().register_new_node_with_optimizer(zer_cmp, main_entry);
+  // phase->igvn().register_new_node_with_optimizer(zer_bol, main_entry);
+
+  // // Build IfNode.
+  // IfNode *zer_iff = new IfNode(main_entry, zer_bol, PROB_FAIR, COUNT_UNKNOWN);
+  // _igvn.register_new_node_with_optimizer(zer_iff);
+  // set_idom(zer_iff, main_entry, dd_main_entry);
+  // set_loop(zer_iff, lpt->_parent);
+
+  // phase->igvn().replace_input_of(main_entry, LoopNode::EntryControl, zer_iff);
+
+  // NOTE: newer implementation
+  Node_List old_new;
+  phase->insert_pre_post_loops(lpt, old_new, false);
+
+  {
+    Node *zero_cmp = zero_trip_test(cl);
+    Node *zero_iv = zero_cmp->in(1);
+    Node *zero_opaq = zero_cmp->in(2);
+    zero_opaq->dump(" zero trip opaq\n");
+    assert(zero_opaq->outcnt() == 1, "opaq should only have one user");
+    Node *zero_opaq_ctrl = phase->get_ctrl(zero_opaq);
+
+    Node *offset = new AddINode(zero_iv, phase->igvn().intcon(7));
+    phase->igvn().register_new_node_with_optimizer(offset);
+
+    phase->igvn().replace_input_of(zero_cmp, 1, offset);
+  }
+
+  {
+    CountedLoopNode *pre_loop = find_pre_loop(cl);
+  }
+
+  // Node *pre_limit_opaque = pre_loop->limit();
+  // Node *pre_limit = pre_limit_opaque->in(1);
+  // assert(pre_limit.Opcode() == Op_Opaque1, "sanity");
+}
+
+
+
 // NOTE: move to IdealLoopTree / loopTransform.cpp?
 bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedLoopNode *cl) {
   const juint VLEN = 8;
-
   Node *induction_phi = cl->phi();
   if (induction_phi == NULL) return false;
   NOT_PRODUCT(tty->print_cr("Found induction phi N%d", induction_phi->_idx));
@@ -749,28 +917,34 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // phase->igvn().register_new_node_with_optimizer(one);
   // phase->igvn().register_new_node_with_optimizer(post_init_trip);
 
-  CountedLoopNode* post_head;
-  {
-    Node_List old_new;
-    phase->insert_post_loop(lpt, old_new, cl, cl->loopexit(), cl->incr(),
-                            cl->limit(), post_head);
-  }
-  post_head->loopexit()->_prob = 1.0f / (VLEN - 1);
+  // NOTE: Post loop
+  // CountedLoopNode* post_head;
+  // {
+  //   Node_List old_new;
+  //   phase->insert_post_loop(lpt, old_new, cl, cl->loopexit(), cl->incr(),
+  //                           cl->limit(), post_head);
+  // }
+  // post_head->loopexit()->_prob = 1.0f / (VLEN - 1);
+
+
+  NOT_PRODUCT(tty->print_cr("pre cl->stride() = %d", cl->stride()->_idx));
 
   // Adjust main loop stride and limit.
+  add_main_loop_range_check(lpt, phase, cl, array_read);
   set_stride(cl, phase, VLEN);
   adjust_limit_to_vec_size(cl, phase, VLEN);
-  // post_head->phi()->set_req(1, cl->phi());
 
+  C->print_method(PHASE_POLY_VECTORIZATION);
 
-  NOT_PRODUCT(tty->print_cr("cl->stride() = %d", cl->stride()->_idx));
+  Node *offset = ConNode::make(TypeInt::make(0));
+  phase->igvn().register_new_node_with_optimizer(offset);
+
+  NOT_PRODUCT(tty->print_cr("post cl->stride() = %d", cl->stride()->_idx));
 
   const uint VECTOR_BYTE_SIZE = VLEN * 4; // 4 4byte ints
   if (C->max_vector_size() < VECTOR_BYTE_SIZE) {
     C->set_max_vector_size(VECTOR_BYTE_SIZE);
   }
-
-
 
   // Node *out_phi = cl->find(155);
   // assert(out_phi->isa_Phi(), "a phi");
@@ -797,21 +971,42 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   phi->set_req(2, add);
 
-  // Replace with initial reduction phi value:
+  // TODO: Replace with initial reduction phi value:
   ConNode *reduce_base = ConNode::make(TypeInt::make(0));
-  Node *reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, add, T_INT);
+  Node *reduce = ReductionNode::make(Op_AddI, NULL, reduction_phi->in(1), add, T_INT);
 
   phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
   phase->igvn().register_new_node_with_optimizer(reduce, NULL);
 
-  phase->igvn().replace_node(rhs, reduce); // Replace right hand side with reduction.
+  Node *opq = new Opaque1Node(C, reduction_phi->in(1));
+  phase->igvn().register_new_node_with_optimizer(opq);
+
+  Node *final_add = new AddINode(reduce, opq);
+  phase->igvn().register_new_node_with_optimizer(final_add);
+
+
+  phase->igvn().replace_node(rhs, final_add); // Replace right hand side with reduction.
   // phase->igvn().replace_input_of(acc_add, 2, reduce);
 
   cl->mark_polynomial_reduction();
   cl->mark_loop_vectorized();
-  cl->double_unrolled_count();
-  cl->double_unrolled_count();
-  cl->double_unrolled_count();
+  //cl->set_main_loop();
+
+  int n_unrolls = exact_log2(VLEN);
+  while (n_unrolls--) {
+    tty->print_cr("Unroll!");
+    cl->double_unrolled_count();
+    // phase->update_main_loop_skeleton_predicates(cl->skip_strip_mined()->in(LoopNode::EntryControl),
+    //                                             cl, cl->init_trip(), cl->stride_con());
+  }
+
+  //lpt->loop_predication(phase);
+  // phase->update_main_loop_skeleton_predicates(cl->skip_strip_mined()->in(LoopNode::EntryControl),
+  //                                             cl, cl->init_trip(),
+  //                                             8);
+
+  // cl->double_unrolled_count();
+  // cl->double_unrolled_count();
 
   //cl->set_slp_max_unroll(VEC_SIZE);
 
@@ -830,10 +1025,14 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
   if (!SuperWordPolynomial) return false;
 
+
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
   if (!cl->stride_is_con() || cl->is_polynomial_reduction() ||
       !cl->is_normal_loop()) return false;
+
+  // NOTE: Do we need/want this one?
+  if (cl->range_checks_present()) return false;
 
   bool inHashCode = strcmp(C->method()->name()->as_utf8(), "stringHashCode") == 0;
 
@@ -841,6 +1040,7 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
     tty->print_cr("Transformed %s in class %s", C->method()->get_Method()->name()->as_utf8(),
                   C->method()->get_Method()->klass_name()->as_utf8());
     C->method()->get_Method()->set_dont_inline(true);
+
     return true;
   }
     // assert(C->method()->name()->equals("asd"), "");

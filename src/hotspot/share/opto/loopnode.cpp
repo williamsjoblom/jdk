@@ -3254,6 +3254,20 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     C->set_major_progress();
   }
 
+  // wilsj
+  if (C->has_loops() && mode == LoopOptsDefault) {
+    // cl->phi() holds the trip counter
+    // tty->print("In method: ");
+    // C->method()->print_name();
+
+    // tty->print("\n");
+    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
+      IdealLoopTree* lpt = iter.current();
+      if (polynomial_reduction_analyze(C, this, &_igvn, lpt))
+         C->set_major_progress();
+    }
+  }
+
   // Keep loop predicates and perform optimizations with them
   // until no more loop optimizations could be done.
   // After that switch predicates off and do more loop optimizations.
@@ -3302,19 +3316,7 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     }
   }
 
-  // wilsj
-  if (C->has_loops() && mode == LoopOptsDefault) {
-    // cl->phi() holds the trip counter
-    // tty->print("In method: ");
-    // C->method()->print_name();
 
-    // tty->print("\n");
-    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
-      IdealLoopTree* lpt = iter.current();
-      if (polynomial_reduction_analyze(C, this, &_igvn, lpt))
-         C->set_major_progress();
-    }
-  }
 
   // Cleanup any modified bits
   _igvn.optimize();

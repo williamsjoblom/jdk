@@ -399,7 +399,6 @@ void Matcher::match( ) {
     Compile::TracePhase tp("postselect_cleanup", &timers[_t_postselect_cleanup]);
     do_postselect_cleanup();
     if (C->failing())  return;
-    C->print_method(PHASE_POLY_VECTORIZATION, 2);
     assert(verify_after_postselect_cleanup(), "");
   }
 }
