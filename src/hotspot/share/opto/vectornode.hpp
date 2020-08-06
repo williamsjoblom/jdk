@@ -719,22 +719,43 @@ class LoadVectorNode : public LoadNode {
                               Node* adr, const TypePtr* atyp,
                               uint vlen, BasicType bt,
                               ControlDependency control_dependency = LoadNode::DependsOnlyOnTest);
+
+  // Create LoadVectorNode loading and promoting the type expected by
+  // `opc` to the basic type `bt`.
+  //
+  // Example given `opc`=Op_LoadUB, `bt`=T_INT, and `vlen`=4:
+  // Load 4 bytes from memory and zero extend each one to 32 bits.
+  static LoadVectorNode* make_promotion(int opc, Node* ctl, Node* mem,
+                                        Node* adr, const TypePtr* atyp,
+                                        uint vlen, BasicType bt,
+                                        ControlDependency control_dependency = LoadNode::DependsOnlyOnTest);
+
+
   uint element_size(void) { return type2aelembytes(vect_type()->element_basic_type()); }
 };
 
-class ShortLoadVectorNode : public LoadVectorNode {
+// Load and zero extend bytes.
+class LoadUBVectorNode : public LoadVectorNode {
 public:
-  ShortLoadVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt, ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
-    : LoadVectorNode(c, mem, adr, at, vt, control_dependency) { }
+  LoadUBVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt,
+                      ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
+    : LoadVectorNode(c, mem, adr, at, vt, control_dependency) {}
 
   virtual int Opcode() const;
 
   virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
+};
 
-  static ShortLoadVectorNode *make(int opc, Node* ctl, Node* mem,
-                                   Node* adr, const TypePtr* atyp,
-                                   uint vlen, BasicType bt,
-                                   ControlDependency control_dependency = LoadNode::DependsOnlyOnTest);
+// Load and sign extend bytes.
+class LoadBVectorNode : public LoadVectorNode {
+public:
+  LoadBVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt,
+                  ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
+    : LoadVectorNode(c, mem, adr, at, vt, control_dependency) {}
+
+  virtual int Opcode() const;
+
+  virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
 };
 
 //------------------------------StoreVectorNode--------------------------------
@@ -815,12 +836,19 @@ class ReplicateDNode : public VectorNode {
   virtual int Opcode() const;
 };
 
+// Promote a single int scalar to the vector [0, 0, ..., scalar]
+class PromoteINode : public VectorNode {
+public:
+  PromoteINode(Node *in1, const TypeVect *vt) : VectorNode(in1, vt) {}
+  virtual int Opcode() const;
+};
+
 //========================Load_Vector_With_Scalars===========================
 
 //------------------------------ReplicateINode---------------------------------
 // Replicate 2 long scalar to be vector
 class ConV4INode : public VectorNode {
- public:
+public:
   ConV4INode(Node *n1, Node *n2, const TypeVect *vt)
     : VectorNode(n1, n2, vt) {
     init_req(0, (Node*)Compile::current()->root());

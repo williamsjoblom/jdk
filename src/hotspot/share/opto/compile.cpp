@@ -3337,7 +3337,8 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
     break;
 
   case Op_LoadVector:
-  case Op_ShortLoadVector:
+  case Op_LoadUBVector:
+  case Op_LoadBVector:
   case Op_StoreVector:
     break;
 

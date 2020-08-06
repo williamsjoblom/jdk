@@ -3098,6 +3098,7 @@ bool IdealLoopTree::do_remove_empty_loop(PhaseIdealLoop *phase) {
   if (!phase->is_member(this, phase->get_ctrl(cl->loopexit()->in(CountedLoopEndNode::TestValue)))) {
     return false;   // Infinite loop
   }
+
   if (cl->is_pre_loop()) {
     // If the loop we are removing is a pre-loop then the main and post loop
     // can be removed as well.

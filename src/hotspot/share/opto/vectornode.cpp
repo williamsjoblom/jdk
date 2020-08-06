@@ -294,6 +294,7 @@ bool VectorNode::is_invariant_vector(Node* n) {
   case Op_ReplicateL:
   case Op_ReplicateF:
   case Op_ReplicateD:
+  case Op_PromoteI:
     return true;
   default:
     return false;
@@ -638,13 +639,19 @@ LoadVectorNode* LoadVectorNode::make(int opc, Node* ctl, Node* mem,
   return new LoadVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
 }
 
-// Return the vector version of a scalar load node.
-ShortLoadVectorNode* ShortLoadVectorNode::make(int opc, Node* ctl, Node* mem,
+LoadVectorNode* LoadVectorNode::make_promotion(int opc, Node* ctl, Node* mem,
                                                Node* adr, const TypePtr* atyp,
                                                uint vlen, BasicType bt,
                                                ControlDependency control_dependency) {
   const TypeVect* vt = TypeVect::make(bt, vlen);
-  return new ShortLoadVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
+  switch (opc) {
+  case Op_LoadUB:
+    return new LoadUBVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
+  case Op_LoadB:
+    return new LoadBVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
+  default: ShouldNotReachHere();
+  }
+  return NULL;
 }
 
 // Return the vector version of a scalar store node.

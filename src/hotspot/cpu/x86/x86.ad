@@ -1861,6 +1861,11 @@ static inline Assembler::AvxVectorLen vector_length_encoding(const MachNode* n) 
   }
 }
 
+static inline BasicType vector_elem_basic_type(const MachNode* n) {
+  const TypeVect* vt = n->bottom_type()->is_vect();
+  return vt->element_basic_type();
+}
+
 // Helper methods for MachSpillCopyNode::implementation().
 static int vec_mov_helper(CodeBuffer *cbuf, bool do_size, int src_lo, int dst_lo,
                           int src_hi, int dst_hi, uint ireg, outputStream* st) {
@@ -3264,19 +3269,45 @@ instruct loadV(vec dst, memory mem) %{
   ins_pipe( pipe_slow );
 %}
 
-instruct loadShortV(vec dst, memory mem) %{
-  // Assumes $dst is 256 bit int vector.
-  // predicate(tty->print_cr("%s", type2name(n->as_Load()->memory_type())), true);
-  match(Set dst (ShortLoadVector mem));
-  format %{ "load_short_vector $dst, $mem" %}
+instruct loadUBV(vec dst, memory mem) %{
+  match(Set dst (LoadUBVector mem));
+  format %{ "load_ub_vector $dst, $mem" %}
   ins_encode %{
-    switch (vector_length(this)) { // TODO: change to vector_length_in_bytes()
-      case 8: __ vpmovzxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
-      default: tty->print_cr("%d", vector_length(this));ShouldNotReachHere();
+    BasicType elem_bt = vector_elem_basic_type(this);
+    int vlen = vector_length(this);
+    if (elem_bt == T_INT) {
+      switch (vlen) { // TODO: change to vector_length_in_bytes()
+        case 4: __ pmovzxbd($dst$$XMMRegister, $mem$$Address); break;
+        case 8: __ vpmovzxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+        default: ShouldNotReachHere();
+      }
+    } else {
+      ShouldNotReachHere();
     }
   %}
   ins_pipe(pipe_slow);
 %}
+
+
+instruct loadBV(vec dst, memory mem) %{
+  match(Set dst (LoadBVector mem));
+  format %{ "load_b_vector $dst, $mem" %}
+  ins_encode %{
+    BasicType elem_bt = vector_elem_basic_type(this);
+    int vlen = vector_length(this);
+    if (elem_bt == T_INT) {
+      switch (vlen) { // TODO: change to vector_length_in_bytes()
+        case 4: __ pmovsxbd($dst$$XMMRegister, $mem$$Address); break;
+        case 8: __ vpmovsxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+        default: ShouldNotReachHere();
+      }
+    } else {
+      ShouldNotReachHere();
+    }
+  %}
+  ins_pipe(pipe_slow);
+%}
+
 
 // Store vectors generic operand pattern.
 instruct storeV(memory mem, vec src) %{
@@ -3819,6 +3850,31 @@ instruct ReplD_zero(vec dst, immD0 zero) %{
     }
   %}
   ins_pipe( fpu_reg_reg );
+%}
+
+// ====================PromoteI=======================================
+
+instruct PromI_reg(vec dst, rRegI src, vec vtmp) %{
+  match(Set dst (PromoteI src));
+  format %{ "promoteI $dst,$src" %}
+  effect(TEMP vtmp);
+  ins_encode %{
+    uint vlen = vector_length(this);
+
+    int vlen_enc = vector_length_encoding(this);
+    __ vpxor($dst$$XMMRegister, $dst$$XMMRegister, $dst$$XMMRegister, vlen_enc);
+    __ movdl($dst$$XMMRegister, $src$$Register);
+    // if (vlen == 4) {
+    //   __ pinsrd($dst$$XMMRegister, $src$$Register, 3);
+    // } else if (vlen == 8) {
+    //   __ vpxor($vtmp$$XMMRegister, $vtmp$$XMMRegister, $vtmp$$XMMRegister, Assembler::AVX_128bit);
+    //   __ pinsrd($vtmp$$XMMRegister, $src$$Register, 3);
+    //   __ vinserti128($dst$$XMMRegister, $dst$$XMMRegister, $vtmp$$XMMRegister, 1);
+    // } else {
+    //   assert(vlen == 8, "not implemented");
+    // }
+  %}
+  ins_pipe( pipe_slow );
 %}
 
 // ====================REDUCTION ARITHMETIC=======================================

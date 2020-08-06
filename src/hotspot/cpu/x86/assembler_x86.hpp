@@ -1719,12 +1719,17 @@ private:
   void pmovzxbw(XMMRegister dst, XMMRegister src);
   void pmovzxbw(XMMRegister dst, Address src);
 
+  // Additional SSE4.1 packed moves
+  void pmovzxbd(XMMRegister dst, Address src);
+  void pmovsxbd(XMMRegister dst, Address src);
+
   // AVX2 packed move
   void vpmovzxbw( XMMRegister dst, Address src, int vector_len);
   void vpmovzxbw(XMMRegister dst, XMMRegister src, int vector_len);
   void evpmovzxbw(XMMRegister dst, KRegister mask, Address src, int vector_len);
   // Additional AVX2 packed moves
   void vpmovzxbd( XMMRegister dst, Address src, int vector_len);
+  void vpmovsxbd( XMMRegister dst, Address src, int vector_len);
 
 
   void evpmovwb(Address dst, XMMRegister src, int vector_len);
