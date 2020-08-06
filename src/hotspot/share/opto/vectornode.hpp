@@ -758,10 +758,20 @@ public:
   virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
 };
 
+class LoadUSVectorNode : public LoadVectorNode {
+  public:
+  LoadUSVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt,
+                  ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
+    : LoadVectorNode(c, mem, adr, at, vt, control_dependency) {}
+
+  virtual int Opcode() const;
+  virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
+};
+
 //------------------------------StoreVectorNode--------------------------------
 // Store Vector to memory
 class StoreVectorNode : public StoreNode {
- public:
+public:
   StoreVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, Node* val)
     : StoreNode(c, mem, adr, at, val, MemNode::unordered) {
     assert(val->is_Vector() || val->is_LoadVector(), "sanity");
@@ -784,7 +794,6 @@ class StoreVectorNode : public StoreNode {
 
   uint element_size(void) { return type2aelembytes(vect_type()->element_basic_type()); }
 };
-
 
 //=========================Promote_Scalar_to_Vector============================
 

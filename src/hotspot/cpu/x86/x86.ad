@@ -3308,6 +3308,25 @@ instruct loadBV(vec dst, memory mem) %{
   ins_pipe(pipe_slow);
 %}
 
+instruct loadUSV(vec dst, memory mem) %{
+  match(Set dst (LoadBVector mem));
+  format %{ "load_us_vector $dst, $mem" %}
+  ins_encode %{
+    BasicType elem_bt = vector_elem_basic_type(this);
+    int vlen = vector_length(this);
+    if (elem_bt == T_INT) {
+      switch (vlen) { // TODO: change to vector_length_in_bytes()
+        // case 4: __ pmovzxwd($dst$$XMMRegister, $mem$$Address); break;
+        case 8: __ vpmovzxwd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+        default: ShouldNotReachHere();
+      }
+    } else {
+      ShouldNotReachHere();
+    }
+  %}
+  ins_pipe(pipe_slow);
+%}
+
 
 // Store vectors generic operand pattern.
 instruct storeV(memory mem, vec src) %{

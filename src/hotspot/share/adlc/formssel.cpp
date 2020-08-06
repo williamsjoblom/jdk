@@ -3482,7 +3482,7 @@ int MatchNode::needs_ideal_memory_edge(FormDict &globals) const {
     "StoreB","StoreC","Store" ,"StoreFP",
     "LoadI", "LoadL", "LoadP" ,"LoadN", "LoadD" ,"LoadF"  ,
     "LoadB" , "LoadUB", "LoadUS" ,"LoadS" ,"Load" ,
-    "StoreVector", "LoadVector", "LoadUBVector", "LoadBVector",
+    "StoreVector", "LoadVector", "LoadUBVector", "LoadBVector", "LoadUSVector",
     "LoadRange", "LoadKlass", "LoadNKlass", "LoadL_unaligned", "LoadD_unaligned",
     "LoadPLocked",
     "StorePConditional", "StoreIConditional", "StoreLConditional",
@@ -4166,7 +4166,7 @@ bool MatchRule::is_vector() const {
     "URShiftVB","URShiftVS","URShiftVI","URShiftVL",
     "ReplicateB","ReplicateS","ReplicateI","ReplicateL","ReplicateF","ReplicateD",
     "PromoteI",
-    "RoundDoubleModeV","LoadVector", "LoadUBVector", "LoadBVector", "StoreVector",
+    "RoundDoubleModeV","LoadVector", "LoadUBVector", "LoadBVector", "LoadUSVector", "StoreVector",
     "FmaVD", "FmaVF","PopCountVI", "ConV4I", "ConV8I",
     // Next are not supported currently.
     "PackB","PackS","PackI","PackL","PackF","PackD","Pack2L","Pack2D",

@@ -77,7 +77,8 @@ protected:
          StripMined=32768,
          SubwordLoop=65536,
          ProfileTripFailed=131072,
-         PolynomialReduction=262144};
+         WasIdiomAnalyzed=262144,
+         PassedIdiomAnalysis=524288};
   char _unswitch_count;
   enum { _unswitch_max=3 };
   char _postloop_flags;
@@ -102,7 +103,6 @@ public:
   bool is_strip_mined() const { return _loop_flags & StripMined; }
   bool is_profile_trip_failed() const { return _loop_flags & ProfileTripFailed; }
   bool is_subword_loop() const { return _loop_flags & SubwordLoop; }
-  bool is_polynomial_reduction() const { return _loop_flags & PolynomialReduction; }
 
   void mark_partial_peel_failed() { _loop_flags |= PartialPeelFailed; }
   void mark_has_reductions() { _loop_flags |= HasReductions; }
@@ -117,7 +117,8 @@ public:
   void clear_strip_mined() { _loop_flags &= ~StripMined; }
   void mark_profile_trip_failed() { _loop_flags |= ProfileTripFailed; }
   void mark_subword_loop() { _loop_flags |= SubwordLoop; }
-  void mark_polynomial_reduction() { _loop_flags |= PolynomialReduction; }
+  void mark_was_idiom_analyzed() { _loop_flags |= WasIdiomAnalyzed; }
+  void mark_passed_idiom_analysis() { _loop_flags |= PassedIdiomAnalysis; }
 
   int unswitch_max() { return _unswitch_max; }
   int unswitch_count() { return _unswitch_count; }
@@ -271,6 +272,8 @@ public:
   bool is_main_no_pre_loop() const { return _loop_flags & MainHasNoPreLoop; }
   bool has_atomic_post_loop  () const { return (_loop_flags & HasAtomicPostLoop) == HasAtomicPostLoop; }
   void set_main_no_pre_loop() { _loop_flags |= MainHasNoPreLoop; }
+  bool was_idiom_analyzed() const { return (_loop_flags&WasIdiomAnalyzed) == WasIdiomAnalyzed; }
+  bool has_passed_idiom_analysis() const { return (_loop_flags&PassedIdiomAnalysis) == PassedIdiomAnalysis; }
 
   int main_idx() const { return _main_idx; }
 

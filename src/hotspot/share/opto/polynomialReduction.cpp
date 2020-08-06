@@ -13,8 +13,30 @@
 #include "utilities/powerOfTwo.hpp"
 #include "opto/opaquenode.hpp"
 
-const uint MAX_SEARCH_DEPTH = 20;
+enum TraceOpts {
+  NoTraceOpts = 0,
+  MinCond = 1 << 0,
+  Match = 1 << 1,
+  Rewrite = 1 << 2,
+  FinalReport = 1 << 3,
+  Candidates = 1 << 4,
+  AllTraceOpts = 0xFFFFFFFF
+};
 
+// Maximum search depth for `find_node`.
+//
+// TODO: The current value of `10` is most likely too high.
+const uint MAX_SEARCH_DEPTH = 10;
+
+// Enabled traces
+const int TRACE_OPTS = MinCond | Match | FinalReport | Candidates;
+
+#define TRACE(OPT, BODY)                                                \
+  do {                                                                  \
+    if (((OPT) & TRACE_OPTS) == (OPT)) {                                \
+      BODY;                                                             \
+    }                                                                   \
+  } while(0)
 
 PhiNode *find_recurrence_phi(CountedLoopNode *cl) {
   // Find _the_ phi node connected with a control edge from the given
@@ -59,6 +81,9 @@ Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List &visited, uint 
   return NULL;
 }
 
+// TODO: most likely too slow to be run on EVERY CountedLoop. We
+// should probably replace the DFS in `find_nodes` with a BFS, reduce
+// `MAX_SEARCH_DEPTH`, or come up with a new solution all together.
 AddNode *find_rhs(PhiNode *reduction_phi) {
   Node_List inputs;
   for (uint i = PhiNode::Input; i < reduction_phi->len(); i++) {
@@ -162,14 +187,12 @@ public:
       Pattern *sp = _subpatterns[i];
       if (sp != ANY) {
         if (next == NULL || !sp->match(next, refs)) {
-          #ifndef PRODUCT
-          if (TRACE_MATCHING) {
-            tty->print("[OpcodePattern] Matching failed for in(%d)", i);
-            n->dump();
-            next != NULL ? next->dump("  ") : tty->print("  NULL");
-            tty->print_cr("");
-          }
-          #endif
+          TRACE(Match, {
+              tty->print("[OpcodePattern] Matching failed for in(%d)", i);
+              n->dump();
+              next != NULL ? next->dump("  ") : tty->print("  NULL");
+              tty->print_cr("");
+            });
           set_ref(NULL, refs);
           return false;
         }
@@ -275,14 +298,12 @@ public:
       Pattern *sp = _subpatterns[i];
       if (sp != ANY) {
         if (next == NULL || !sp->match(next, refs)) {
-          #ifndef PRODUCT
-          if (TRACE_MATCHING) {
-            tty->print("[Pred2Pattern] Matching failed for in(%d):", i);
-            n->dump();
-            next != NULL ? next->dump("  ") : tty->print("  NULL");
-            tty->print_cr("");
-          }
-          #endif
+          TRACE(Match, {
+              tty->print("[Pred2Pattern] Matching failed for in(%d):", i);
+              n->dump();
+              next != NULL ? next->dump("  ") : tty->print("  NULL");
+              tty->print_cr("");
+            });
           set_ref(NULL, refs);
           return false;
         }
@@ -314,33 +335,6 @@ bool is_array_ptr(Node *n) {
 
 bool is_primitive_load(Node *n) {
   return n->is_Load() && is_java_primitive(n->bottom_type()->basic_type());
-}
-
-bool match_x_mul_31(Node *start, Node *x) {
-  ResourceMark rm;
-
-  enum {
-    THE_CONSTANT,
-    N_REFS
-  };
-
-  MatchRefs refs(N_REFS);
-  Pattern *p = new OpcodePattern<3>
-    (Op_SubI,
-     ANY,                                         // Control
-     new OpcodePattern<3>               // LHS
-     (Op_LShiftI,
-      ANY,                                            // Control
-      new ExactNodePattern(x),                        // LHS
-      new OpcodePattern<0>(Op_ConI, THE_CONSTANT)),     // RHS
-     new ExactNodePattern(x));                    // RHS
-
-  if (p->match(start, refs)) {
-    tty->print("Successfully matched with shift distance %d\n", refs[THE_CONSTANT]->get_int());
-    return true;
-  } else {
-    return false;
-  }
 }
 
 // Array read pattern instance.
@@ -420,6 +414,10 @@ bool match_shift_con_mul(Node *start, Node *of, ConMul &result) {
 
     return true;
   } else {
+    TRACE(Match, {
+        tty->print_cr("  origin shift_con_mul");
+      });
+
     return false;
   }
 }
@@ -450,6 +448,9 @@ bool match_identity_con_mul(Node *start, Node *of, ConMul &result) {
     result.multiplier = 1;
     return true;
   } else {
+    TRACE(Match, {
+        tty->print_cr("  origin identity_con_mul");
+      });
     return false;
   }
 }
@@ -529,6 +530,9 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
     assert(result._load_ctrl->isa_Proj(), "");
     return true;
   } else {
+    TRACE(Match, {
+        tty->print_cr("  origin array_read");
+      });
     return false;
   }
 }
@@ -612,7 +616,10 @@ Node *build_array_load(PhaseIdealLoop *phase, ArrayRead& array_read, uint vlen) 
   BasicType load_type = array_read._bt;
   BasicType elem_type = load->memory_type();
 
-  tty->print_cr("load: %s, elem: %s", type2name(load_type), type2name(elem_type));
+  TRACE(Rewrite, {
+      tty->print_cr("load: %s, elem: %s", type2name(load_type),
+                    type2name(elem_type));
+    });
 
   // No implicit cast.
   if (elem_type == load_type) {
@@ -667,12 +674,13 @@ void split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
                 CountedLoopNode *cl, ArrayRead &read,
                 juint vlen) {
   Node_List old_new;
-  phase->insert_pre_post_loops(lpt, old_new, false);
+  if (cl->is_normal_loop()) {
+    phase->insert_pre_post_loops(lpt, old_new, false);
+  }
 
   Node *zero_cmp = zero_trip_test(cl);
   Node *zero_iv = zero_cmp->in(1);
   Node *zero_opaq = zero_cmp->in(2);
-  NOT_PRODUCT(zero_opaq->dump(" zero trip opaq\n"));
   assert(zero_opaq->outcnt() == 1, "opaq should only have one user");
   Node *zero_opaq_ctrl = phase->get_ctrl(zero_opaq);
 
@@ -719,28 +727,35 @@ void adjust_limit_to_vlen(CountedLoopNode *cl, PhaseIdealLoop *phase, jint vlen)
 }
 
 bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedLoopNode *cl) {
-  const juint VLEN = 4;
+  const juint VLEN = 8;
   Node *induction_phi = cl->phi();
   if (induction_phi == NULL) return false;
-  NOT_PRODUCT(tty->print_cr("Found induction phi N%d", induction_phi->_idx));
+  TRACE(MinCond, {
+      tty->print_cr("Found induction phi N%d", induction_phi->_idx);
+    });
 
   // PhiNode holding the current value of the recurrence variable.
   PhiNode *reduction_phi = find_recurrence_phi(cl);
   if (reduction_phi == NULL) return false;
-  NOT_PRODUCT(tty->print_cr("Found reduction phi N%d", reduction_phi->_idx));
+  TRACE(MinCond, {
+    tty->print_cr("Found reduction phi N%d", reduction_phi->_idx);
+  });
 
   // Right hand side of the assignment.
   Node *rhs = find_rhs(reduction_phi); //find_rhs(acc_add, reduction_phi);
   if (rhs == NULL) return false;
-  NOT_PRODUCT(tty->print_cr("Found right-hand-side N%d", rhs->_idx));
+  TRACE(MinCond, {
+      tty->print_cr("Found right-hand-side N%d", rhs->_idx);
+    });
 
   ConMul con_mul;
   ArrayRead array_read;
 
-  if (!match_con_mul(rhs->in(1), reduction_phi, con_mul)) return false;
-  if (!match_array_read(rhs->in(2), induction_phi, array_read)) return false;
-
-  NOT_PRODUCT(tty->print_cr("APPLYING TRANSFORMATION! m = %d", con_mul.multiplier));
+  if (!match_con_mul(rhs->in(1), reduction_phi, con_mul) ||
+      !match_array_read(rhs->in(2), induction_phi, array_read)) {
+    C->print_method(PHASE_POLY_VECTORIZATION);
+    return false;
+  }
 
   // Build post-loop for the remaining iterations that does not fill
   // up a full vector.
@@ -758,9 +773,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // }
   // post_head->loopexit()->_prob = 1.0f / (VLEN - 1);
 
-
-  NOT_PRODUCT(tty->print_cr("pre cl->stride() = %d", cl->stride()->_idx));
-
   // Adjust main loop stride and limit.
   split_loop(lpt, phase, cl, array_read, VLEN);
   set_stride(cl, phase, VLEN);
@@ -770,8 +782,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   Node *offset = ConNode::make(TypeInt::make(0));
   phase->igvn().register_new_node_with_optimizer(offset);
-
-  NOT_PRODUCT(tty->print_cr("post cl->stride() = %d", cl->stride()->_idx));
 
   const uint VECTOR_BYTE_SIZE = VLEN * 4; // 4 4byte ints
   if (C->max_vector_size() < VECTOR_BYTE_SIZE) {
@@ -823,16 +833,9 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   phase->igvn().replace_node(rhs, reduce); // Replace right hand side with reduction.
   // phase->igvn().replace_input_of(acc_add, 2, reduce);
 
-  cl->mark_polynomial_reduction();
-  cl->mark_loop_vectorized();
-  //cl->set_main_loop();
-
   int n_unrolls = exact_log2(VLEN);
   while (n_unrolls--) {
-    tty->print_cr("Unroll!");
     cl->double_unrolled_count();
-    // phase->update_main_loop_skeleton_predicates(cl->skip_strip_mined()->in(LoopNode::EntryControl),
-    //                                             cl, cl->init_trip(), cl->stride_con());
   }
 
   //lpt->loop_predication(phase);
@@ -860,47 +863,43 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
   if (!SuperWordPolynomial) return false;
 
-  if (!lpt->is_counted() || !lpt->is_innermost()) return false;
-  NOT_PRODUCT(tty->print_cr("[PolyReduce] counted & innermost: %s", C->method()->name()->as_utf8()));
-  CountedLoopNode *cl = lpt->_head->as_CountedLoop();
-  if (!cl->stride_is_con() || cl->is_polynomial_reduction() ||
-      !cl->is_normal_loop()) return false;
-  NOT_PRODUCT(tty->print_cr("[PolyReduce] con stride & normal: %s", C->method()->name()->as_utf8()));
+  // TRACE(Candidates, {
+  //     tty->print_cr("Initial analysis of %s::%s",
+  //                   C->method()->get_Method()->klass_name()->as_utf8(),
+  //                   C->method()->get_Method()->name()->as_utf8());
+  //   });
 
+  if (!lpt->is_counted() || !lpt->is_innermost()) return false;
+  CountedLoopNode *cl = lpt->_head->as_CountedLoop();
+  if (!cl->stride_is_con() || cl->was_slp_analyzed() ||
+      cl->is_pre_loop() || cl->is_post_loop()) return false;
 
   // NOTE: Do we need/want this one?
   if (cl->range_checks_present()) return false;
 
-  bool inHashCode = strcmp(C->method()->name()->as_utf8(), "stringHashCode") == 0;
+  TRACE(Candidates, {
+      tty->print_cr("Starting analysis of %s::%s",
+                    C->method()->get_Method()->klass_name()->as_utf8(),
+                    C->method()->get_Method()->name()->as_utf8());
+    });
 
-  if (build_stuff(C, lpt, phase, igvn, cl)) {
-    tty->print_cr("Transformed %s in class %s", C->method()->get_Method()->name()->as_utf8(),
-                  C->method()->get_Method()->klass_name()->as_utf8());
-    C->method()->get_Method()->set_dont_inline(true);
+  bool ok = build_stuff(C, lpt, phase, igvn, cl);
+  cl->mark_was_idiom_analyzed();
+  if (ok) {
+    TRACE(FinalReport, {
+        tty->print_cr("Transformed %s::%s",
+                      C->method()->get_Method()->klass_name()->as_utf8(),
+                      C->method()->get_Method()->name()->as_utf8());
+        C->method()->get_Method()->set_dont_inline(true);
+      });
 
+    cl->mark_passed_idiom_analysis();
+    cl->mark_loop_vectorized();
     return true;
   }
 
   return false;
-  //ResourceMark rm;
-  // GrowableArray<InductionArrayRead> chains = get_array_access_chains(cl->phi());
-
-  // if (chains.is_nonempty()) {
-  //   tty->print("-");
-  //   for (GrowableArrayIterator<InductionArrayRead> it = chains.begin();
-  //        it != chains.end(); ++it) {
-  //     tty->print("Found array access with induction variable LoopNode: %d, "
-  //                "base_ptr: %d, out: %d\n",
-  //               cl->_idx, (*it)._base_ptr->_idx, (*it)._out->_idx);
-  //   }
-  // }
-
-  // tty->print("Found counted loop idx: %d, phi-idx: %d\n", cl->_idx, cl->phi()->_idx);
-  // tty->print(" With outs idx: ");
-  // for (DUIterator it = cl->outs(); cl->has_out(it); it++) {
-  //   // tty->print("%d ", cl->out(it)->_idx);
-  // }
-  // tty->print("\n");
 }
 
+#undef TRACE
 #undef ANY

@@ -649,6 +649,8 @@ LoadVectorNode* LoadVectorNode::make_promotion(int opc, Node* ctl, Node* mem,
     return new LoadUBVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
   case Op_LoadB:
     return new LoadBVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
+  case Op_LoadUS:
+    return new LoadUSVectorNode(ctl, mem, adr, atyp, vt, control_dependency);
   default: ShouldNotReachHere();
   }
   return NULL;

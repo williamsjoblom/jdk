@@ -756,7 +756,15 @@ bool IdealLoopTree::policy_unroll(PhaseIdealLoop *phase) {
   CountedLoopNode *cl = _head->as_CountedLoop();
   assert(cl->is_normal_loop() || cl->is_main_loop(), "");
 
-  if (cl->is_polynomial_reduction()) return false;
+  // Delay unrolling until the loop has been analyzed for vectorizable
+  // idioms.
+  if (SuperWordPolynomial && !cl->was_idiom_analyzed()) return false;
+  // Disable unrolling for loops that has been idiom vectorized.
+  if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
+  // {
+  //   tty->print_cr("WARNING: unroll disabled!");
+  //   return false;
+  // }
 
   if (!cl->is_valid_counted_loop()) {
     return false; // Malformed counted loop

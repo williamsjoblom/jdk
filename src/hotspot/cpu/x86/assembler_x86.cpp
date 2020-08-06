@@ -3838,6 +3838,18 @@ void Assembler::vpmovzxbd(XMMRegister dst, Address src, int vector_len) {
   emit_operand(dst, src);
 }
 
+void Assembler::vpmovzxwd(XMMRegister dst, Address src, int vector_len) {
+  assert(VM_Version::supports_avx2(), "");
+  assert(vector_len == Assembler::AVX_256bit, "currently only 256 bit vectors supported");
+  InstructionMark im(this);
+  assert(dst != xnoreg, "sanity");
+  InstructionAttr attributes(vector_len, /* rex_w */ false, /* legacy_mode */ _legacy_mode_bw, /* no_mask_reg */ true, /* uses_vl */ true);
+  attributes.set_address_attributes(/* tuple_type */ EVEX_HVM, /* input_size_in_bits */ EVEX_NObit);
+  vex_prefix(src, 0, dst->encoding(), VEX_SIMD_66, VEX_OPCODE_0F_38, &attributes);
+  emit_int8(0x33);
+  emit_operand(dst, src);
+}
+
 void Assembler::vpmovsxbd(XMMRegister dst, Address src, int vector_len) {
   assert(VM_Version::supports_avx2(), "");
   assert(vector_len == Assembler::AVX_256bit, "currently only 256 bit vectors supported");

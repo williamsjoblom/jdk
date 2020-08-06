@@ -3235,6 +3235,21 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     // all the code before the peeled area, so the verify pass will always
     // complain about it.
   }
+
+  // wilsj
+  if (C->has_loops() && mode == LoopOptsDefault) {
+    // cl->phi() holds the trip counter
+    // tty->print("In method: ");
+    // C->method()->print_name();
+
+    // tty->print("\n");
+    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
+      IdealLoopTree* lpt = iter.current();
+      if (polynomial_reduction_analyze(C, this, &_igvn, lpt))
+         C->set_major_progress();
+    }
+  }
+
   // Do verify graph edges in any case
   NOT_PRODUCT( C->verify_graph_edges(); );
 
@@ -3252,20 +3267,6 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
   // Repeat loop optimizations if new loops were seen
   if (created_loop_node()) {
     C->set_major_progress();
-  }
-
-  // wilsj
-  if (C->has_loops() && mode == LoopOptsDefault) {
-    // cl->phi() holds the trip counter
-    // tty->print("In method: ");
-    // C->method()->print_name();
-
-    // tty->print("\n");
-    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
-      IdealLoopTree* lpt = iter.current();
-      if (polynomial_reduction_analyze(C, this, &_igvn, lpt))
-         C->set_major_progress();
-    }
   }
 
   // Keep loop predicates and perform optimizations with them

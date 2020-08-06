@@ -1729,7 +1729,9 @@ private:
   void evpmovzxbw(XMMRegister dst, KRegister mask, Address src, int vector_len);
   // Additional AVX2 packed moves
   void vpmovzxbd( XMMRegister dst, Address src, int vector_len);
+  void vpmovzxwd( XMMRegister dst, Address src, int vector_len);
   void vpmovsxbd( XMMRegister dst, Address src, int vector_len);
+
 
 
   void evpmovwb(Address dst, XMMRegister src, int vector_len);
