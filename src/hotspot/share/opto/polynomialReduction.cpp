@@ -25,8 +25,8 @@ enum TraceOpts {
 
 // Maximum search depth for `find_node`.
 //
-// TODO: The current value of `10` is most likely too high.
-const uint MAX_SEARCH_DEPTH = 10;
+// TODO: The current value of `20` is most likely too high.
+const uint MAX_SEARCH_DEPTH = 20;
 
 // Enabled traces
 const int TRACE_OPTS = MinCond | Match | FinalReport | Candidates;
@@ -52,7 +52,15 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl) {
     // edge?
     if (n->is_Phi() && n != induction_phi) {
       // Only allow loops with one cross-iteration dependecy for now:
-      if (recurrence_phi != NULL) return NULL;
+      if (recurrence_phi != NULL) {
+        TRACE(MinCond, {
+            tty->print_cr("Multiple recurrence phi's found. Aborting...");
+            tty->print("  First:  "); recurrence_phi->dump("\n");
+            tty->print("  Second: "); n->dump("\n");
+            tty->print("  IV:     "); induction_phi->dump("\n");
+          });
+        return NULL;
+      }
 
       recurrence_phi = n;
     }
@@ -753,7 +761,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   if (!match_con_mul(rhs->in(1), reduction_phi, con_mul) ||
       !match_array_read(rhs->in(2), induction_phi, array_read)) {
-    C->print_method(PHASE_POLY_VECTORIZATION);
     return false;
   }
 
@@ -778,7 +785,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   set_stride(cl, phase, VLEN);
   adjust_limit_to_vlen(cl, phase, VLEN);
 
-  C->print_method(PHASE_POLY_VECTORIZATION);
 
   Node *offset = ConNode::make(TypeInt::make(0));
   phase->igvn().register_new_node_with_optimizer(offset);
@@ -862,22 +868,33 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
   if (!SuperWordPolynomial) return false;
-
-  // TRACE(Candidates, {
-  //     tty->print_cr("Initial analysis of %s::%s",
-  //                   C->method()->get_Method()->klass_name()->as_utf8(),
-  //                   C->method()->get_Method()->name()->as_utf8());
-  //   });
-
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
-  if (!cl->stride_is_con() || cl->was_slp_analyzed() ||
-      cl->is_pre_loop() || cl->is_post_loop()) return false;
+  if (cl->has_passed_idiom_analysis() || cl->is_vectorized_loop() ||
+      !cl->is_normal_loop()) return false;
+
+  TRACE(Candidates, {
+      tty->print_cr("Initial analysis of %s::%s",
+                    C->method()->get_Method()->klass_name()->as_utf8(),
+                    C->method()->get_Method()->name()->as_utf8());
+    });
+
+  if (!cl->stride_is_con()) return false;
+  TRACE(Candidates, {
+      tty->print_cr("  Loop is constant stride");
+    });
 
   // NOTE: Do we need/want this one?
   if (cl->range_checks_present()) return false;
 
   TRACE(Candidates, {
+      tty->print_cr("  Loop has no range checks");
+      tty->print_cr("  ALL OK!");
+    });
+
+  C->print_method(PHASE_BEFORE_IDIOM_VECTORIZATION);
+
+  TRACE(Match, {
       tty->print_cr("Starting analysis of %s::%s",
                     C->method()->get_Method()->klass_name()->as_utf8(),
                     C->method()->get_Method()->name()->as_utf8());
@@ -895,7 +912,15 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
 
     cl->mark_passed_idiom_analysis();
     cl->mark_loop_vectorized();
+    C->print_method(PHASE_AFTER_IDIOM_VECTORIZATION);
     return true;
+  } else {
+    TRACE(FinalReport, {
+        tty->print_cr("Failed %s::%s",
+                      C->method()->get_Method()->klass_name()->as_utf8(),
+                      C->method()->get_Method()->name()->as_utf8());
+      });
+    C->print_method(PHASE_FAILED_IDIOM_VECTORIZATION);
   }
 
   return false;
