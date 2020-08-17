@@ -12,14 +12,26 @@
 #include "opto/output.hpp"
 #include "utilities/powerOfTwo.hpp"
 #include "opto/opaquenode.hpp"
+#include "utilities/align.hpp"
 
+/****************************************************************
+ * Forward declarations.
+ ***************************************************************/
+VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, juint vec_size);
+VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size);
+
+/****************************************************************
+ * Tracing.
+ ****************************************************************/
 enum TraceOpts {
   NoTraceOpts = 0,
   MinCond = 1 << 0,
   Match = 1 << 1,
   Rewrite = 1 << 2,
-  FinalReport = 1 << 3,
-  Candidates = 1 << 4,
+  Success = 1 << 3,
+  Failure = 1 << 4,
+  FinalReport = Success | Failure,
+  Candidates = 1 << 5,
   AllTraceOpts = 0xFFFFFFFF
 };
 
@@ -29,15 +41,43 @@ enum TraceOpts {
 const uint MAX_SEARCH_DEPTH = 20;
 
 // Enabled traces
-const int TRACE_OPTS = MinCond | Match | FinalReport | Candidates;
+const int TRACE_OPTS = Success | Failure;
 
 #define TRACE(OPT, BODY)                                                \
   do {                                                                  \
-    if (((OPT) & TRACE_OPTS) == (OPT)) {                                \
+    if (((OPT) & TRACE_OPTS) != 0) {                                    \
       BODY;                                                             \
     }                                                                   \
   } while(0)
 
+/****************************************************************
+ * Predicates.
+ ****************************************************************/
+bool is_array_ptr(Node *n) {
+  return n->is_Type() && n->as_Type()->type()->isa_aryptr() != NULL;
+}
+
+bool is_primitive_load(Node *n) {
+  return n->is_Load() && is_java_primitive(n->bottom_type()->basic_type());
+}
+
+// Is this an binary operation.
+bool is_binop(Node *n) {
+  switch (n->Opcode()) {
+  case Op_AddI:
+  case Op_SubI:
+  case Op_MulI:
+  case Op_DivI:
+  case Op_LShiftI:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/****************************************************************
+ * Minimum matching condition.
+ ****************************************************************/
 PhiNode *find_recurrence_phi(CountedLoopNode *cl) {
   // Find _the_ phi node connected with a control edge from the given
   // CountedLoop (excluding the phi node associated with the induction
@@ -50,7 +90,8 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl) {
     Node *n = cl->out(it);
     // NOTE: maybe check that the edge we just followed is a control
     // edge?
-    if (n->is_Phi() && n != induction_phi) {
+    if (n->is_Phi() && n != induction_phi &&
+        is_java_primitive(n->bottom_type()->basic_type())) {
       // Only allow loops with one cross-iteration dependecy for now:
       if (recurrence_phi != NULL) {
         TRACE(MinCond, {
@@ -92,7 +133,9 @@ Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List &visited, uint 
 // TODO: most likely too slow to be run on EVERY CountedLoop. We
 // should probably replace the DFS in `find_nodes` with a BFS, reduce
 // `MAX_SEARCH_DEPTH`, or come up with a new solution all together.
-AddNode *find_rhs(PhiNode *reduction_phi) {
+Node *find_rhs(PhiNode *reduction_phi) {
+  return reduction_phi->in(2);
+
   Node_List inputs;
   for (uint i = PhiNode::Input; i < reduction_phi->len(); i++) {
     inputs.push(reduction_phi->in(i));
@@ -101,7 +144,7 @@ AddNode *find_rhs(PhiNode *reduction_phi) {
   Unique_Node_List visited;
   Node *bottom = find_nodes(reduction_phi, inputs, visited);
 
-  return bottom != NULL ? bottom->isa_Add() : NULL;
+  return bottom;
 }
 
 /****************************************************************
@@ -335,18 +378,17 @@ public:
 };
 
 /****************************************************************
- * Predicates.
+ * Pattern instances.
  ****************************************************************/
-bool is_array_ptr(Node *n) {
-  return n->is_Type() && n->as_Type()->type()->isa_aryptr() != NULL;
-}
 
-bool is_primitive_load(Node *n) {
-  return n->is_Load() && is_java_primitive(n->bottom_type()->basic_type());
-}
+struct PatternInstance : ResourceObj {
+  // Generate Node.
+  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) = 0;
+  virtual Node *result() = 0;
+};
 
 // Array read pattern instance.
-struct ArrayRead {
+struct ArrayLoadPattern : PatternInstance {
   // Basic type of loaded value.
   BasicType _bt;
 
@@ -373,6 +415,88 @@ struct ArrayRead {
 
   // Base offset of the array.
   jlong _base_offset;
+
+  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
+    LoadNode *load = _load->as_Load();
+    BasicType load_type = _bt;
+    BasicType elem_type = load->memory_type();
+
+    TRACE(Rewrite, {
+        tty->print_cr("load: %s, elem: %s", type2name(load_type),
+                      type2name(elem_type));
+      });
+
+    // No implicit cast.
+    if (elem_type == load_type) {
+      Node *arr = LoadVectorNode::make(
+        _load->Opcode(), _load->in(LoadNode::Control),
+        _memory, _load->in(LoadNode::Address),
+        _load->adr_type(), vlen, load_type);
+      phase->igvn().register_new_node_with_optimizer(arr, NULL);
+      return arr;
+    } else {
+      Node *arr = LoadVectorNode::make_promotion(
+        _load->Opcode(), _load->in(LoadNode::Control),
+        _memory, _load->in(LoadNode::Address),
+        _load->adr_type(), vlen, load_type);
+      phase->igvn().register_new_node_with_optimizer(arr, NULL);
+      return arr;
+    }
+
+    ShouldNotReachHere();
+    return NULL;
+  }
+
+  virtual Node *result() {
+    return _load;
+  }
+};
+
+struct ScalarPattern : PatternInstance {
+  Node *_scalar;
+
+  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
+    return make_vector(phase, _scalar, vlen);
+  }
+
+  virtual Node *result() {
+    return _scalar;
+  }
+};
+
+struct BinOpPattern : PatternInstance {
+  int _opcode;
+  PatternInstance *_lhs, *_rhs;
+  BasicType _bt;
+
+  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
+    Node *lhs = _lhs->generate(phase, vlen);
+    Node *rhs = _rhs->generate(phase, vlen);
+
+    Node *result = VectorNode::make(_opcode, lhs, rhs, vlen, _bt);
+    phase->igvn().register_new_node_with_optimizer(result);
+    return result;
+  }
+
+  virtual Node *result() {
+    ShouldNotCallThis();
+    return NULL;
+  }
+};
+
+struct LShiftPattern : BinOpPattern {
+  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
+    assert(_opcode == Op_LShiftI, "sanity");
+    assert(_rhs->result()->is_Con(), "not implemented");
+
+    Node *lhs = _lhs->generate(phase, vlen);
+
+    Node *multiplier = phase->igvn().intcon(1 << _rhs->result()->get_int());
+    Node *result = new MulVINode(lhs, make_vector(phase, multiplier, vlen),
+                                 TypeVect::make(T_INT, vlen));
+    phase->igvn().register_new_node_with_optimizer(result);
+    return result;
+  }
 };
 
 struct ConMul {
@@ -473,7 +597,9 @@ bool match_con_mul(Node *start, Node *of, ConMul &result) {
 }
 
 // Match array read.
-bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
+ArrayLoadPattern *match_array_read(Node *start, Node *idx) {
+  ArrayLoadPattern *result = new ArrayLoadPattern();
+
   ResourceMark rm;
 
   enum {
@@ -522,27 +648,83 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
       LOAD_NODE);
 
   if (p->match(start, refs)) {
-    result._load_ctrl = refs[LOAD_CTRL];
-    result._load = refs[LOAD_NODE];
-    result._bt = result._load->bottom_type()->basic_type();
-    result._index = idx;
-    result._result = start;
-    result._array_ptr = refs[ARRAY];
-    result._memory = refs[MEMORY];
-    result._elem_byte_size =
+    result->_load_ctrl = refs[LOAD_CTRL];
+    result->_load = refs[LOAD_NODE];
+    result->_bt = result->_load->bottom_type()->basic_type();
+    result->_index = idx;
+    result->_result = start;
+    result->_array_ptr = refs[ARRAY];
+    result->_memory = refs[MEMORY];
+    result->_elem_byte_size =
       1 << (refs[IDX_SHIFT_DISTANCE] != NULL
             ? refs[IDX_SHIFT_DISTANCE]->get_int()
             : 0);
-    result._base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
+    result->_base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
 
-    assert(result._load_ctrl->isa_Proj(), "");
-    return true;
+    assert(result->_load_ctrl->isa_Proj(), "");
+    return result;
   } else {
     TRACE(Match, {
         tty->print_cr("  origin array_read");
       });
-    return false;
+    return NULL;
   }
+}
+
+PatternInstance *match(Node *start, Node *iv);
+
+PatternInstance *match_binop(Node *start, Node *iv) {
+  // Only accept binary operations without control dependence.
+  if (!(is_binop(start) && start->in(0) == NULL)) return NULL;
+
+  Node *lhs = start->in(1);
+  Node *rhs = start->in(2);
+  assert(lhs != NULL && rhs != NULL, "sanity");
+
+  PatternInstance *lhs_p = match(lhs, iv);
+  if (lhs_p == NULL) return NULL;
+  PatternInstance *rhs_p = match(rhs, iv);
+  if (rhs_p == NULL) return NULL;
+
+  BinOpPattern *pi = start->Opcode() != Op_LShiftI
+    ? new BinOpPattern()
+    : new LShiftPattern();
+  pi->_opcode = start->Opcode();
+  pi->_lhs = lhs_p;
+  pi->_rhs = rhs_p;
+  pi->_bt = start->bottom_type()->array_element_basic_type();
+
+  return pi;
+}
+
+PatternInstance *match_scalar(Node *start) {
+  // NOTE: Assumes the scalar to be loop invariant. Presence of loop
+  // variant scalars should exit idiom vectorization early. To account
+  // for this, we currently only accept scalar constants.
+  if (start->Opcode() == Op_ConI) {
+    ScalarPattern *p = new ScalarPattern();
+    p->_scalar = start;
+    return p;
+  } else {
+    return NULL;
+  }
+}
+
+PatternInstance *match(Node *start, Node *iv) {
+  PatternInstance *pi;
+  if (pi = match_array_read(start, iv))
+    return pi;
+  if (pi = match_binop(start, iv))
+    return pi;
+  if (pi = match_scalar(start))
+    return pi;
+
+  TRACE(Match, {
+      tty->print_cr("Unable to find pattern instance.");
+      tty->print("  "); start->dump(" start node");
+    });
+
+  return NULL;
 }
 
 /****************************************************************
@@ -550,14 +732,18 @@ bool match_array_read(Node *start, Node *idx, ArrayRead &result) {
  ****************************************************************/
 
 // Make int vector containing [init, init, ..., init]
+VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, juint vec_size) {
+  // TODO: Make vector type depend on recurrence variable type.
+  VectorNode *v = VectorNode::scalar2vector(init, vec_size, TypeInt::INT);
+  phase->igvn().register_new_node_with_optimizer(v);
+  return v;
+}
+
+// Make int vector containing [init, init, ..., init]
 VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size) {
   ConNode *init_con = ConNode::make(TypeInt::make(init));
-  VectorNode *acc = VectorNode::scalar2vector(init_con, vec_size, TypeInt::INT);
-
   phase->igvn().register_new_node_with_optimizer(init_con);
-  phase->igvn().register_new_node_with_optimizer(acc);
-
-  return acc;
+  return make_vector(phase, init_con, vec_size);
 }
 
 // Make 4 int vector containing [n^{vlen}, n^{vlen-1}, ..., n^1, n^0].
@@ -619,7 +805,7 @@ jint my_pow(jint n, jint exp) {
 }
 
 // Build vector array load from a matched ArrayRead.
-Node *build_array_load(PhaseIdealLoop *phase, ArrayRead& array_read, uint vlen) {
+Node *build_array_load(PhaseIdealLoop *phase, ArrayLoadPattern& array_read, uint vlen) {
   LoadNode *load = array_read._load->as_Load();
   BasicType load_type = array_read._bt;
   BasicType elem_type = load->memory_type();
@@ -679,8 +865,7 @@ CmpNode *zero_trip_test(CountedLoopNode *loop) {
 // Split loop into a pre, main, and post loop and adjust zero trip
 // guard for the main loop to account for the vector length.
 void split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
-                CountedLoopNode *cl, ArrayRead &read,
-                juint vlen) {
+                CountedLoopNode *cl, juint vlen) {
   Node_List old_new;
   if (cl->is_normal_loop()) {
     phase->insert_pre_post_loops(lpt, old_new, false);
@@ -695,8 +880,6 @@ void split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
   Node *offset = new AddINode(zero_iv, phase->igvn().intcon(vlen - 1));
   phase->igvn().register_new_node_with_optimizer(offset);
   phase->igvn().replace_input_of(zero_cmp, 1, offset);
-
-
 }
 
 // Set stride of the given loop.
@@ -751,18 +934,26 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   // Right hand side of the assignment.
   Node *rhs = find_rhs(reduction_phi); //find_rhs(acc_add, reduction_phi);
-  if (rhs == NULL) return false;
+  if (rhs == NULL || rhs->req() < 2) return false;
   TRACE(MinCond, {
       tty->print_cr("Found right-hand-side N%d", rhs->_idx);
     });
 
-  ConMul con_mul;
-  ArrayRead array_read;
+  ResourceMark rm;
 
-  if (!match_con_mul(rhs->in(1), reduction_phi, con_mul) ||
-      !match_array_read(rhs->in(2), induction_phi, array_read)) {
+  ConMul con_mul;
+  //ArrayLoadPattern *array_read = match_array_read(rhs->in(2), induction_phi);
+  if (!match_con_mul(rhs->in(1), reduction_phi, con_mul)) {
+    TRACE(Match, {
+        tty->print_cr("Unable to find recurrence phi");
+        tty->print("  "); rhs->dump(" right hand side");
+      });
+
     return false;
   }
+
+  PatternInstance *pi = match(rhs->in(2), induction_phi);
+  if (pi == NULL) return false;
 
   // Build post-loop for the remaining iterations that does not fill
   // up a full vector.
@@ -781,13 +972,11 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // post_head->loopexit()->_prob = 1.0f / (VLEN - 1);
 
   // Adjust main loop stride and limit.
-  split_loop(lpt, phase, cl, array_read, VLEN);
+  split_loop(lpt, phase, cl, VLEN);
   set_stride(cl, phase, VLEN);
   adjust_limit_to_vlen(cl, phase, VLEN);
 
-
-  Node *offset = ConNode::make(TypeInt::make(0));
-  phase->igvn().register_new_node_with_optimizer(offset);
+  // first_aligned_element(, int target_alignment)
 
   const uint VECTOR_BYTE_SIZE = VLEN * 4; // 4 4byte ints
   if (C->max_vector_size() < VECTOR_BYTE_SIZE) {
@@ -800,7 +989,7 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // Constant multiplier
   Node *mulv = make_vector(phase, my_pow(con_mul.multiplier, VLEN), VLEN);
 
-  Node *arr = build_array_load(phase, array_read, VLEN);
+  Node *arr = pi->generate(phase, VLEN); //build_array_load(phase, array_read, VLEN);
 
   Node *initial_acc = new PromoteINode(reduction_phi->in(1), TypeVect::make(T_INT, VLEN)); // make_vector(phase, 0, VLEN);
   phase->igvn().register_new_node_with_optimizer(initial_acc);
@@ -812,8 +1001,17 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   // TODO: Investigate performance if replaced with vector x scalar
   // multiplication (`mulv` is a vector of scalar duplicates).
-  Node *mul0 = new MulVINode(mulv, phi, TypeVect::make(T_INT, VLEN));
-  phase->igvn().register_new_node_with_optimizer(mul0);
+  Node *mul0;
+
+  // If we do not multiply our recurrence variable, don't create an
+  // multiplication.
+  if (con_mul.multiplier != 1) {
+    mul0 = new MulVINode(mulv, phi, TypeVect::make(T_INT, VLEN));
+    phase->igvn().register_new_node_with_optimizer(mul0);
+  } else {
+     mul0 = phi;
+  }
+
   Node *mul1 = new MulVINode(arr, m, TypeVect::make(T_INT, VLEN));
   phase->igvn().register_new_node_with_optimizer(mul1);
 
@@ -903,11 +1101,11 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
   bool ok = build_stuff(C, lpt, phase, igvn, cl);
   cl->mark_was_idiom_analyzed();
   if (ok) {
-    TRACE(FinalReport, {
+    TRACE(Success, {
         tty->print_cr("Transformed %s::%s",
                       C->method()->get_Method()->klass_name()->as_utf8(),
                       C->method()->get_Method()->name()->as_utf8());
-        C->method()->get_Method()->set_dont_inline(true);
+        // C->method()->get_Method()->set_dont_inline(true);
       });
 
     cl->mark_passed_idiom_analysis();
@@ -915,7 +1113,7 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
     C->print_method(PHASE_AFTER_IDIOM_VECTORIZATION);
     return true;
   } else {
-    TRACE(FinalReport, {
+    TRACE(Failure, {
         tty->print_cr("Failed %s::%s",
                       C->method()->get_Method()->klass_name()->as_utf8(),
                       C->method()->get_Method()->name()->as_utf8());

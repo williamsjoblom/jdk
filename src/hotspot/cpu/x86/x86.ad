@@ -3309,7 +3309,7 @@ instruct loadBV(vec dst, memory mem) %{
 %}
 
 instruct loadUSV(vec dst, memory mem) %{
-  match(Set dst (LoadBVector mem));
+  match(Set dst (LoadUSVector mem));
   format %{ "load_us_vector $dst, $mem" %}
   ins_encode %{
     BasicType elem_bt = vector_elem_basic_type(this);
