@@ -43,12 +43,17 @@ const uint MAX_SEARCH_DEPTH = 20;
 // Enabled traces
 const int TRACE_OPTS = Success | Failure;
 
+#ifndef PRODUCT
 #define TRACE(OPT, BODY)                                                \
   do {                                                                  \
     if (((OPT) & TRACE_OPTS) != 0) {                                    \
       BODY;                                                             \
     }                                                                   \
   } while(0)
+#else
+#define TRACE(OPT, BODY)                        \
+  do { } while (0)
+#endif
 
 /****************************************************************
  * Predicates.
