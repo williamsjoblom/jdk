@@ -83,6 +83,11 @@ bool is_binop(Node *n) {
 /****************************************************************
  * Minimum matching condition.
  ****************************************************************/
+bool has_control_flow(CountedLoopNode *cl) {
+  Node *exit = cl->loopexit();
+  return exit->in(0) == cl;
+}
+
 PhiNode *find_recurrence_phi(CountedLoopNode *cl) {
   // Find _the_ phi node connected with a control edge from the given
   // CountedLoop (excluding the phi node associated with the induction
@@ -1086,15 +1091,17 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
     });
 
   if (!cl->stride_is_con()) return false;
-  TRACE(Candidates, {
-      tty->print_cr("  Loop is constant stride");
-    });
+  TRACE(Candidates, { tty->print_cr("  Loop is constant stride"); });
 
   // NOTE: Do we need/want this one?
   if (cl->range_checks_present()) return false;
 
+  TRACE(Candidates, { tty->print_cr("  Loop has no range checks"); });
+
+  if (has_control_flow(cl)) return false;
+
   TRACE(Candidates, {
-      tty->print_cr("  Loop has no range checks");
+      tty->print_cr("  Loop has trivial control flow");
       tty->print_cr("  ALL OK!");
     });
 

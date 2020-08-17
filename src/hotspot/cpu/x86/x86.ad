@@ -3279,6 +3279,7 @@ instruct loadUBV(vec dst, memory mem) %{
       switch (vlen) { // TODO: change to vector_length_in_bytes()
         case 4: __ pmovzxbd($dst$$XMMRegister, $mem$$Address); break;
         case 8: __ vpmovzxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+        case 16: assert(false, "not implemented"); break;
         default: ShouldNotReachHere();
       }
     } else {
@@ -3299,6 +3300,7 @@ instruct loadBV(vec dst, memory mem) %{
       switch (vlen) { // TODO: change to vector_length_in_bytes()
         case 4: __ pmovsxbd($dst$$XMMRegister, $mem$$Address); break;
         case 8: __ vpmovsxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+        case 16: assert(false, "not implemented"); break;
         default: ShouldNotReachHere();
       }
     } else {
@@ -3316,12 +3318,50 @@ instruct loadUSV(vec dst, memory mem) %{
     int vlen = vector_length(this);
     if (elem_bt == T_INT) {
       switch (vlen) { // TODO: change to vector_length_in_bytes()
-        // case 4: __ pmovzxwd($dst$$XMMRegister, $mem$$Address); break;
+        case 4: __ pmovzxwd($dst$$XMMRegister, $mem$$Address); break;
         case 8: __ vpmovzxwd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+        case 16: assert(false, "not implemented"); break;
         default: ShouldNotReachHere();
       }
     } else {
       ShouldNotReachHere();
+    }
+  %}
+  ins_pipe(pipe_slow);
+%}
+
+instruct loadSV(vec dst, memory mem) %{
+  match(Set dst (LoadSVector mem));
+  format %{ "load_s_vector $dst, $mem" %}
+  ins_encode %{
+    BasicType elem_bt = vector_elem_basic_type(this);
+    int vlen = vector_length(this);
+    if (elem_bt == T_INT) {
+      switch (vlen) { // TODO: change to vector_length_in_bytes()
+        case 4: __ pmovsxwd($dst$$XMMRegister, $mem$$Address); break;
+        case 8: __ vpmovsxwd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit) break;
+        case 16: assert(false, "not implemented"); break;
+        default: ShouldNotReachHere();
+      }
+    } else {
+      ShouldNotReachHere();
+    }
+  %}
+  ins_pipe(pipe_slow);
+%}
+
+instruct loadIV(vec dst, memory mem) %{
+  match(Set dst (LoadIVector mem));
+  format %{ "load_i_vector $dst, $mem" %}
+  ins_encode %{
+    BasicType elem_bt = vector_elem_basic_type(this);
+    int vlen = vector_length(this);
+    assert(elem_bt == T_LONG);
+    switch (vlen) { // TODO: change to vector_length_in_bytes()
+      case 2: __ pmovsxdq($dst$$XMMRegister, $mem$$Address) break;
+      case 4: __ vpmovsxdq($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
+      case 8: assert(false, "not implemented"); break;
+      default: ShouldNotReachHere();
     }
   %}
   ins_pipe(pipe_slow);

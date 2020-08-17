@@ -1829,6 +1829,8 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_c2_type(LoadUBVectorNode, LoadVectorNode)                       \
   declare_c2_type(LoadBVectorNode, LoadVectorNode)                        \
   declare_c2_type(LoadUSVectorNode, LoadVectorNode)                       \
+  declare_c2_type(LoadSVectorNode, LoadVectorNode)                        \
+  declare_c2_type(LoadIVectorNode, LoadVectorNode)                        \
   declare_c2_type(StoreVectorNode, StoreNode)                             \
   declare_c2_type(ReplicateBNode, VectorNode)                             \
   declare_c2_type(ReplicateSNode, VectorNode)                             \

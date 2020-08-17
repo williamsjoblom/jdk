@@ -758,9 +758,32 @@ public:
   virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
 };
 
+// Load and zero extend shorts.
 class LoadUSVectorNode : public LoadVectorNode {
   public:
   LoadUSVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt,
+                  ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
+    : LoadVectorNode(c, mem, adr, at, vt, control_dependency) {}
+
+  virtual int Opcode() const;
+  virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
+};
+
+// Load and sign extend short.
+class LoadSVectorNode : public LoadVectorNode {
+  public:
+  LoadSVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt,
+                  ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
+    : LoadVectorNode(c, mem, adr, at, vt, control_dependency) {}
+
+  virtual int Opcode() const;
+  virtual int store_Opcode() const { ShouldNotCallThis(); return 0; }
+};
+
+// Load and sign extend integers.
+class LoadIVectorNode : public LoadVectorNode {
+  public:
+  LoadIVectorNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt,
                   ControlDependency control_dependency = LoadNode::DependsOnlyOnTest)
     : LoadVectorNode(c, mem, adr, at, vt, control_dependency) {}
 

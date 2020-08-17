@@ -1722,6 +1722,9 @@ private:
   // Additional SSE4.1 packed moves
   void pmovzxbd(XMMRegister dst, Address src);
   void pmovsxbd(XMMRegister dst, Address src);
+  void pmovzxwd(XMMRegister dst, Address src);
+  void pmovsxwd(XMMRegister dst, Address src);
+  void pmovsxdq(XMMRegister dst, Address src);
 
   // AVX2 packed move
   void vpmovzxbw( XMMRegister dst, Address src, int vector_len);
@@ -1731,7 +1734,8 @@ private:
   void vpmovzxbd( XMMRegister dst, Address src, int vector_len);
   void vpmovzxwd( XMMRegister dst, Address src, int vector_len);
   void vpmovsxbd( XMMRegister dst, Address src, int vector_len);
-
+  void vpmovsxwd(XMMRegister dst, Address src, int vector_len);
+  void vpmovsxdq(XMMRegister dst, Address src, int vector_len);
 
 
   void evpmovwb(Address dst, XMMRegister src, int vector_len);
