@@ -864,7 +864,7 @@ CmpNode *zero_trip_test(CountedLoopNode *loop) {
  ****************************************************************/
 // Split loop into a pre, main, and post loop and adjust zero trip
 // guard for the main loop to account for the vector length.
-void split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
+Node *split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
                 CountedLoopNode *cl, juint vlen) {
   Node_List old_new;
   if (cl->is_normal_loop()) {
@@ -877,9 +877,11 @@ void split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
   assert(zero_opaq->outcnt() == 1, "opaq should only have one user");
   Node *zero_opaq_ctrl = phase->get_ctrl(zero_opaq);
 
-  Node *offset = new AddINode(zero_iv, phase->igvn().intcon(vlen - 1));
-  phase->igvn().register_new_node_with_optimizer(offset);
-  phase->igvn().replace_input_of(zero_cmp, 1, offset);
+  Node *adjusted_limit = new SubINode(zero_opaq, phase->igvn().intcon(vlen));
+  phase->igvn().register_new_node_with_optimizer(adjusted_limit);
+  phase->igvn().replace_input_of(zero_cmp, 2, adjusted_limit);
+
+  return adjusted_limit;
 }
 
 // Set stride of the given loop.
@@ -899,20 +901,21 @@ void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
 }
 
 // Adjust loop limit to account for the vector length.
-void adjust_limit_to_vlen(CountedLoopNode *cl, PhaseIdealLoop *phase, jint vlen) {
+void adjust_limit(CountedLoopNode *cl, PhaseIdealLoop *phase, Node *adjusted_limit) {
   // WARNING: (limit - stride) may underflow!!!
   const uint LIMIT = 2;
   Node *cmp = cl->loopexit()->cmp_node();
   assert(cmp != NULL && cmp->req() == 3, "no loop limit found");
-  Node *limit = cmp->in(LIMIT);
 
-  Node *new_stride = ConNode::make(TypeInt::make(vlen));
-  Node *adjusted_limit = new SubINode(limit, new_stride);
+  // Node *limit = cmp->in(LIMIT);
 
-  assert(adjusted_limit != NULL, "adj limit");
+  // Node *new_stride = ConNode::make(TypeInt::make(vlen));
+  // Node *adjusted_limit = new SubINode(limit, new_stride);
 
-  phase->igvn().register_new_node_with_optimizer(new_stride);
-  phase->igvn().register_new_node_with_optimizer(adjusted_limit);
+  // assert(adjusted_limit != NULL, "adj limit");
+
+  // phase->igvn().register_new_node_with_optimizer(new_stride);
+  // phase->igvn().register_new_node_with_optimizer(adjusted_limit);
 
   phase->igvn().replace_input_of(cmp, LIMIT, adjusted_limit);
 }
@@ -972,9 +975,9 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // post_head->loopexit()->_prob = 1.0f / (VLEN - 1);
 
   // Adjust main loop stride and limit.
-  split_loop(lpt, phase, cl, VLEN);
+  Node *new_limit = split_loop(lpt, phase, cl, VLEN);
   set_stride(cl, phase, VLEN);
-  adjust_limit_to_vlen(cl, phase, VLEN);
+  adjust_limit(cl, phase, new_limit);
 
   // first_aligned_element(, int target_alignment)
 
