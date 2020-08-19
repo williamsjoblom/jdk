@@ -17,8 +17,8 @@
 /****************************************************************
  * Forward declarations.
  ***************************************************************/
-VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, juint vec_size);
-VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size);
+VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, const Type *recurr_t, juint vec_size);
+VectorNode *make_vector(PhaseIdealLoop *phase, jint init, const Type *recurr_t, juint vec_size);
 jint my_pow(jint n, jint exp);
 
 /****************************************************************
@@ -45,8 +45,8 @@ const int TRACE_OPTS = AllTraceOpts;
 // and is likely to produce a significant performance hit.
 const uint MAX_SEARCH_DEPTH = 20;
 
-// TEMP: BasicType of recurrence variable.
-Type const *RECURR_T;
+// // TEMP: BasicType of recurrence variable.
+// Type const *RECURR_T;
 
 #ifndef PRODUCT
 #define TRACE(OPT, BODY)                                                \
@@ -403,7 +403,7 @@ public:
 
 struct PatternInstance : ResourceObj {
   // Generate Node.
-  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) = 0;
+  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) = 0;
   virtual Node *result() = 0;
 };
 
@@ -436,7 +436,9 @@ struct ArrayLoadPattern : PatternInstance {
   // Base offset of the array.
   jlong _base_offset;
 
-  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
+  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
+    BasicType recurr_bt = recurr_t->array_element_basic_type();
+
     LoadNode *load = _load->as_Load();
     BasicType load_type = _bt;
     BasicType elem_type = load->memory_type();
@@ -447,18 +449,18 @@ struct ArrayLoadPattern : PatternInstance {
       });
 
     // No implicit cast.
-    if (elem_type == load_type) {
+    if (elem_type == recurr_bt) {
       Node *arr = LoadVectorNode::make(
         _load->Opcode(), _load->in(LoadNode::Control),
         _memory, _load->in(LoadNode::Address),
-        _load->adr_type(), vlen, load_type);
+        _load->adr_type(), vlen, recurr_bt);
       phase->igvn().register_new_node_with_optimizer(arr, NULL);
       return arr;
     } else {
       Node *arr = LoadVectorNode::make_promotion(
         _load->Opcode(), _load->in(LoadNode::Control),
         _memory, _load->in(LoadNode::Address),
-        _load->adr_type(), vlen, load_type);
+        _load->adr_type(), vlen, recurr_bt);
       phase->igvn().register_new_node_with_optimizer(arr, NULL);
       return arr;
     }
@@ -475,8 +477,8 @@ struct ArrayLoadPattern : PatternInstance {
 struct ScalarPattern : PatternInstance {
   Node *_scalar;
 
-  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
-    return make_vector(phase, _scalar, vlen);
+  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
+    return make_vector(phase, _scalar, recurr_t, vlen);
   }
 
   virtual Node *result() {
@@ -489,10 +491,11 @@ struct BinOpPattern : PatternInstance {
   PatternInstance *_lhs, *_rhs;
   BasicType _bt;
 
-  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
-    Node *lhs = _lhs->generate(phase, vlen);
-    Node *rhs = _rhs->generate(phase, vlen);
+  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
+    Node *lhs = _lhs->generate(phase, recurr_t, vlen);
+    Node *rhs = _rhs->generate(phase, recurr_t, vlen);
 
+    // TODO: Should we use `_bt` or `recurr_t->array_element_basic_type()` here?
     Node *result = VectorNode::make(_opcode, lhs, rhs, vlen, _bt);
     phase->igvn().register_new_node_with_optimizer(result);
     return result;
@@ -505,15 +508,17 @@ struct BinOpPattern : PatternInstance {
 };
 
 struct LShiftPattern : BinOpPattern {
-  virtual Node *generate(PhaseIdealLoop *phase, uint vlen) {
+  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
     assert(_opcode == Op_LShiftI, "sanity");
     assert(_rhs->result()->is_Con(), "not implemented");
 
-    Node *lhs = _lhs->generate(phase, vlen);
+    BasicType recurr_bt = recurr_t->array_element_basic_type();
+    Node *lhs = _lhs->generate(phase, recurr_t, vlen);
 
     Node *multiplier = phase->igvn().intcon(1 << _rhs->result()->get_int());
-    Node *result = new MulVINode(lhs, make_vector(phase, multiplier, vlen),
-                                 TypeVect::make(RECURR_T->basic_type(), vlen));
+    Node *result = VectorNode::make(Op_MulI, lhs, make_vector(phase, multiplier, recurr_t, vlen), vlen, recurr_bt);
+    //new MulVINode(lhs, make_vector(phase, multiplier, vlen),
+    //TypeVect::make(recurr_bt, vlen));
     phase->igvn().register_new_node_with_optimizer(result);
     return result;
   }
@@ -614,6 +619,28 @@ bool match_con_mul(Node *start, Node *of, ConMul &result) {
     match_identity_con_mul(start, of, result) ||
     match_shift_con_mul(start, of, result) ||
     match_trivial_con_mul(start, of, result);
+}
+
+// Match demotion of integer to byte/short, returning the node being
+// demoted and setting `bt` to the resulting type of the demotion.
+Node *match_int_demotion(Node *start, BasicType& bt) {
+  if (start->Opcode() != Op_RShiftI ||
+      start->in(1)->Opcode() != Op_LShiftI ||
+      start->in(2)->Opcode() != Op_ConI ||
+      start->in(1)->in(2) != start->in(2)) {
+    bt = T_INT;
+
+    return start;
+  } else {
+    Node *con = start->in(2);
+    switch (con->get_int()) {
+    case 16: bt = T_SHORT; break;
+    case 24: bt = T_BYTE; break;
+    default: return start;
+    }
+
+    return start->in(1)->in(1);
+  }
 }
 
 // Match array read.
@@ -770,41 +797,45 @@ PatternInstance *match(Node *start, Node *iv) {
 
 // Make int vector containing [init, init, ..., init]
 // TODO: Fix compatibility with basic types other than `T_INT`.
-VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, juint vec_size) {
+VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, const Type *recurr_t, juint vec_size) {
   // TODO: Make vector type depend on recurrence variable type.
-  VectorNode *v = VectorNode::scalar2vector(init, vec_size, RECURR_T);
+  VectorNode *v = VectorNode::scalar2vector(init, vec_size, recurr_t);
   phase->igvn().register_new_node_with_optimizer(v);
+
   return v;
 }
 
 // Make int vector containing [init, init, ..., init]
-VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size) {
-  ConNode *init_con = RECURR_T->basic_type() == T_LONG
+VectorNode *make_vector(PhaseIdealLoop *phase, jint init, const Type *recurr_t, juint vec_size) {
+  ConNode *init_con = recurr_t->basic_type() == T_LONG
     ? ConNode::make(TypeLong::make(init))
     : ConNode::make(TypeInt::make(init));
 
   phase->igvn().register_new_node_with_optimizer(init_con);
-  return make_vector(phase, init_con, vec_size);
+  return make_vector(phase, init_con, recurr_t, vec_size);
 }
 
 jlong exp_vector_part(int i, jint n, int elem_bytes) {
+  jlong mask = (1l << elem_bytes*8) - 1;
+
   jlong result = 0;
-  jint next_n = my_pow(n, i * (sizeof(jlong) / elem_bytes));
+  jlong next_n = my_pow(n, i * (sizeof(jlong) / elem_bytes));
   for (uint i = 0; i < sizeof(jlong) / elem_bytes; i++) {
-    result = next_n | result << (elem_bytes*8);
+    result = (next_n & mask) | (result << (elem_bytes*8));
     next_n *= n;
   }
   return result;
 }
 
 // Make vector containing [n^{vlen}, n^{vlen-1}, ..., n^1, n^0].
-VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen, BasicType bt) {
+VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen, const Type *t) {
   if (0 <= n && n <= 1) {
     // [0^3, 0^2, 0^1, 0^0] = [0, 0, 0, 0] and
     // [1^3, 1^2, 1^1, 1^0] = [1, 1, 1, 1]
-    return make_vector(phase, n, vlen);
+    return make_vector(phase, n, t, vlen);
   }
 
+  BasicType bt = t->array_element_basic_type();
   int elem_bytes = type2aelembytes(bt);
   int elem_bits = elem_bytes*8;
   int vector_bytes = type2aelembytes(bt)*vlen;
@@ -855,37 +886,37 @@ jint my_pow(jint n, jint exp) {
   return result;
 }
 
-// Build vector array load from a matched ArrayRead.
-Node *build_array_load(PhaseIdealLoop *phase, ArrayLoadPattern& array_read, uint vlen) {
-  LoadNode *load = array_read._load->as_Load();
-  BasicType load_type = array_read._bt;
-  BasicType elem_type = load->memory_type();
+// // Build vector array load from a matched ArrayRead.
+// Node *build_array_load(PhaseIdealLoop *phase, ArrayLoadPattern& array_read, uint vlen) {
+//   LoadNode *load = array_read._load->as_Load();
+//   BasicType load_type = array_read._bt;
+//   BasicType elem_type = load->memory_type();
 
-  TRACE(Rewrite, {
-      tty->print_cr("load: %s, elem: %s", type2name(load_type),
-                    type2name(elem_type));
-    });
+//   TRACE(Rewrite, {
+//       tty->print_cr("load: %s, elem: %s", type2name(load_type),
+//                     type2name(elem_type));
+//     });
 
-  // No implicit cast.
-  if (elem_type == load_type) {
-     Node *arr = LoadVectorNode::make(
-        array_read._load->Opcode(), array_read._load->in(LoadNode::Control),
-        array_read._memory, array_read._load->in(LoadNode::Address),
-        array_read._load->adr_type(), vlen, load_type);
-     phase->igvn().register_new_node_with_optimizer(arr, NULL);
-     return arr;
-  } else {
-    Node *arr = LoadVectorNode::make_promotion(
-        array_read._load->Opcode(), array_read._load->in(LoadNode::Control),
-        array_read._memory, array_read._load->in(LoadNode::Address),
-        array_read._load->adr_type(), vlen, load_type);
-    phase->igvn().register_new_node_with_optimizer(arr, NULL);
-    return arr;
-  }
+//   // No implicit cast.
+//   if (elem_type == load_type) {
+//      Node *arr = LoadVectorNode::make(
+//         array_read._load->Opcode(), array_read._load->in(LoadNode::Control),
+//         array_read._memory, array_read._load->in(LoadNode::Address),
+//         array_read._load->adr_type(), vlen, load_type);
+//      phase->igvn().register_new_node_with_optimizer(arr, NULL);
+//      return arr;
+//   } else {
+//     Node *arr = LoadVectorNode::make_promotion(
+//         array_read._load->Opcode(), array_read._load->in(LoadNode::Control),
+//         array_read._memory, array_read._load->in(LoadNode::Address),
+//         array_read._load->adr_type(), vlen, load_type);
+//     phase->igvn().register_new_node_with_optimizer(arr, NULL);
+//     return arr;
+//   }
 
-  ShouldNotReachHere();
-  return NULL;
-}
+//   ShouldNotReachHere();
+//   return NULL;
+// }
 
 
 // Find the pre loop end of the given main loop.
@@ -960,8 +991,32 @@ void adjust_limit(CountedLoopNode *cl, PhaseIdealLoop *phase, Node *adjusted_lim
   phase->igvn().replace_input_of(cmp, LIMIT, adjusted_limit);
 }
 
-bool check_cpu_features(uint vbytes, uint ) {
-  return true;
+// TODO: move to Matcher::
+bool check_cpu_features(uint vbytes, BasicType recurr_bt) {
+  bool r = true;
+
+  switch (vbytes) {
+  case 16: r &= VM_Version::supports_sse4_2(); break;
+  case 32: r &= VM_Version::supports_avx2(); break;
+  case 64: r &= VM_Version::supports_evex(); break;
+  default: return false;
+  }
+
+  switch (recurr_bt) {
+  case T_BYTE:
+  case T_SHORT:
+    r &= (vbytes == 64) ? VM_Version::supports_avx512bw() : true;
+    break;
+  case T_INT:
+    break;
+  case T_LONG:
+    r &= VM_Version::supports_avx512vldq();
+    break;
+  default:
+    return false;
+  }
+
+  return r;
 }
 
 bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedLoopNode *cl) {
@@ -989,9 +1044,13 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   ResourceMark rm;
 
+  BasicType recurr_bt;
+  Node *start = match_int_demotion(rhs, recurr_bt);
+  const Type *recurr_t = Type::get_const_basic_type(recurr_bt);
+
   ConMul con_mul;
   //ArrayLoadPattern *array_read = match_array_read(rhs->in(2), induction_phi);
-  if (!match_con_mul(rhs->in(1), reduction_phi, con_mul)) {
+  if (!match_con_mul(start->in(1), reduction_phi, con_mul)) {
     TRACE(Match, {
         tty->print_cr("Unable to find recurrence phi");
         tty->print("  "); rhs->dump(" right hand side\n");
@@ -1000,11 +1059,10 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
     return false;
   }
 
-  PatternInstance *pi = match(rhs->in(2), induction_phi);
+  PatternInstance *pi = match(start->in(2), induction_phi);
   if (pi == NULL) return false;
 
-  const BasicType recurrence_type = RECURR_T->basic_type(); //reduction_phi->bottom_type()->basic_type();
-  const juint VLEN = VBYTES / type2aelembytes(recurrence_type);
+  const juint VLEN = VBYTES / type2aelembytes(recurr_bt);
 
   // Adjust main loop stride and limit.
   Node *new_limit = split_loop(lpt, phase, cl, VLEN);
@@ -1021,13 +1079,13 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // assert(out_phi->isa_Phi(), "a phi");
 
   // Constant multiplier.
-  Node *mulv = make_vector(phase, my_pow(con_mul.multiplier, VLEN), VLEN);
+  Node *mulv = make_vector(phase, my_pow(con_mul.multiplier, VLEN), recurr_t, VLEN);
 
-  Node *arr = pi->generate(phase, VLEN); //build_array_load(phase, array_read, VLEN);
+  Node *arr = pi->generate(phase, recurr_t, VLEN); //build_array_load(phase, array_read, VLEN);
 
-  Node *initial_acc = new PromoteINode(reduction_phi->in(1), TypeVect::make(RECURR_T->basic_type(), VLEN)); // make_vector(phase, 0, VLEN);
+  Node *initial_acc = new PromoteINode(reduction_phi->in(1), TypeVect::make(recurr_bt, VLEN)); // make_vector(phase, 0, VLEN);
   phase->igvn().register_new_node_with_optimizer(initial_acc);
-  Node *m = make_exp_vector(phase, con_mul.multiplier, VLEN, RECURR_T->basic_type());
+  Node *m = make_exp_vector(phase, con_mul.multiplier, VLEN, recurr_t);
 
   Node *phi = PhiNode::make(induction_phi->in(PhiNode::Region), initial_acc);
   phase->igvn().register_new_node_with_optimizer(phi);
@@ -1040,29 +1098,31 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // If we do not multiply our recurrence variable, don't create an
   // multiplication.
   if (con_mul.multiplier != 1) {
-    mul0 = new MulVINode(mulv, phi, TypeVect::make(RECURR_T->basic_type(), VLEN));
+    mul0 = VectorNode::make(Op_MulI, mulv, phi, VLEN, recurr_bt); //new MulVINode(mulv, phi, TypeVect::make(recurr_bt, VLEN));
     phase->igvn().register_new_node_with_optimizer(mul0);
   } else {
      mul0 = phi;
   }
 
-  Node *mul1 = new MulVLNode(arr, m, TypeVect::make(RECURR_T->basic_type(), VLEN));
+  Node *mul1 = VectorNode::make(Op_MulI, arr, m, VLEN, recurr_bt); //new MulVINode(arr, m, TypeVect::make(recurr_bt, VLEN));
   phase->igvn().register_new_node_with_optimizer(mul1);
 
-  Node *add = new AddVLNode(mul0, mul1, TypeVect::make(RECURR_T->basic_type(), VLEN));
+  Node *add = VectorNode::make(Op_AddI, mul0, mul1, VLEN, recurr_bt); //AddVINode(mul0, mul1, TypeVect::make(recurr_bt, VLEN));
   phase->igvn().register_new_node_with_optimizer(add);
 
   phi->set_req(2, add);
 
-  ConNode *reduce_base;
-  if (RECURR_T->basic_type() == T_LONG)
-    reduce_base = ConNode::make(TypeLong::make(0));
-  else
-    reduce_base = ConNode::make(TypeInt::make(0));
 
-  Node *reduce = ReductionNode::make(Op_AddL, NULL, reduce_base, add, RECURR_T->basic_type());
-
-  phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
+  Node *reduce;
+  if (recurr_bt == T_LONG) {
+    ConNode *reduce_base = ConNode::make(TypeLong::make(0));
+    phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
+    reduce = ReductionNode::make(Op_AddL, NULL, reduce_base, add, recurr_bt);
+  } else {
+    ConNode *reduce_base = ConNode::make(TypeInt::make(0));
+    phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
+    reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, add, recurr_bt);
+  }
   phase->igvn().register_new_node_with_optimizer(reduce, NULL);
 
   // Node *opq = new Opaque1Node(C, reduction_phi->in(1));
@@ -1103,7 +1163,7 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 }
 
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
-  RECURR_T = TypeLong::LONG;
+  // RECURR_T = TypeInt::SHORT;
 
   if (!SuperWordPolynomial) return false;
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
@@ -1147,7 +1207,6 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
         tty->print_cr("Transformed %s::%s",
                       C->method()->get_Method()->klass_name()->as_utf8(),
                       C->method()->get_Method()->name()->as_utf8());
-        // C->method()->get_Method()->set_dont_inline(true);
       });
 
     cl->mark_passed_idiom_analysis();

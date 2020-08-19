@@ -1321,6 +1321,7 @@ const bool Matcher::match_rule_supported(int opcode) {
     case Op_AbsVS:
     case Op_AbsVI:
     case Op_AddReductionVI:
+    case Op_AddReductionVS:
     case Op_AndReductionV:
     case Op_OrReductionV:
     case Op_XorReductionV:
@@ -3277,7 +3278,7 @@ instruct loadUBV(vec dst, memory mem) %{
     int vlen = vector_length(this);
     if (elem_bt == T_SHORT) {
       switch (vlen) { // TODO: change to vector_length_in_bytes()
-        case 8: __ pmovzxbd($dst$$XMMRegister, $mem$$Address); break;
+        case 8: __ pmovzxbw($dst$$XMMRegister, $mem$$Address); break;
         case 16: assert(false, "not implemented"); break;
         case 32: assert(false, "not implemented"); break;
         default: ShouldNotReachHere();
@@ -3980,6 +3981,22 @@ instruct PromL_reg(vec dst, rRegL src) %{
 %}
 
 // ====================REDUCTION ARITHMETIC=======================================
+// ======================Short Reduction==========================================
+instruct reductionS(rRegI dst, rRegI src1, vec src2, vec vtmp1, vec vtmp2) %{
+  predicate(n->in(2)->bottom_type()->is_vect()->element_basic_type() == T_SHORT &&
+            n->in(2)->bottom_type()->is_vect()->length() < 32);
+  match(Set dst (AddReductionVS src1 src2));
+  effect(TEMP vtmp1, TEMP vtmp2);
+  format %{ "vector_reduction_short $dst,$src1,$src2 ; using $vtmp1, $vtmp2 as TEMP" %}
+  ins_encode %{
+    int opcode = this->ideal_Opcode();
+    int vlen = vector_length(this, $src2);
+    __ reduceS(opcode, vlen, $dst$$Register, $src1$$Register, $src2$$XMMRegister, $vtmp1$$XMMRegister, $vtmp2$$XMMRegister);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+
 // =======================Int Reduction==========================================
 
 instruct reductionI(rRegI dst, rRegI src1, vec src2, vec vtmp1, vec vtmp2) %{

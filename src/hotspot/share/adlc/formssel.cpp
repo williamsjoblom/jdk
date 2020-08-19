@@ -4044,6 +4044,7 @@ int MatchRule::is_expensive() const {
         strcmp(opType,"ReplicateD")==0 ||
         strcmp(opType,"PromoteINode")==0 ||
         strcmp(opType,"AddReductionVI")==0 ||
+        strcmp(opType,"AddReductionVS")==0 ||
         strcmp(opType,"AddReductionVL")==0 ||
         strcmp(opType,"AddReductionVF")==0 ||
         strcmp(opType,"AddReductionVD")==0 ||
@@ -4154,7 +4155,7 @@ bool MatchRule::is_vector() const {
     "SqrtVD","SqrtVF",
     "AndV" ,"XorV" ,"OrV",
     "MaxV", "MinV",
-    "AddReductionVI", "AddReductionVL",
+    "AddReductionVI", "AddReductionVS", "AddReductionVL",
     "AddReductionVF", "AddReductionVD",
     "MulReductionVI", "MulReductionVL",
     "MulReductionVF", "MulReductionVD",

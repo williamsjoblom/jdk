@@ -948,6 +948,7 @@ void C2_MacroAssembler::reduce_operation_128(int opcode, XMMRegister dst, XMMReg
 
     case Op_AddReductionVF: addss(dst, src); break;
     case Op_AddReductionVD: addsd(dst, src); break;
+    case Op_AddReductionVS: paddw(dst, src); break;
     case Op_AddReductionVI: paddd(dst, src); break;
     case Op_AddReductionVL: paddq(dst, src); break;
 
@@ -993,6 +994,19 @@ void C2_MacroAssembler::reduce_fp(int opcode, int vlen,
       break;
 
     default: assert(false, "wrong opcode");
+  }
+}
+
+void C2_MacroAssembler::reduceS(int opcode, int vlen,
+                                Register dst, Register src1, XMMRegister src2,
+                                XMMRegister vtmp1, XMMRegister vtmp2) {
+  switch (vlen) {
+    case  4: reduce4S (opcode, dst, src1, src2, vtmp1, vtmp2); break;
+    case  8: reduce8S (opcode, dst, src1, src2, vtmp1, vtmp2); break;
+    case 16: reduce16S(opcode, dst, src1, src2, vtmp1, vtmp2); break;
+    case 32: reduce32S(opcode, dst, src1, src2, vtmp1, vtmp2); break;
+
+    default: assert(false, "wrong vector length");
   }
 }
 
@@ -1058,6 +1072,57 @@ void C2_MacroAssembler::reduceD(int opcode, int vlen, XMMRegister dst, XMMRegist
     default: assert(false, "wrong vector length");
   }
 }
+
+void C2_MacroAssembler::reduce2S (int opcode, Register dst, Register src1,
+                                  XMMRegister src2, XMMRegister vtmp1,
+                                  XMMRegister vtmp2){
+  assert(opcode == Op_AddReductionVS, "");
+  if (vtmp1 != src2) {
+    movdqu(vtmp1, src2);
+  }
+  phaddw(vtmp1, vtmp1);
+
+  movdl(vtmp2, src1);
+  reduce_operation_128(opcode, vtmp1, vtmp2);
+  movdl(dst, vtmp1);
+}
+
+void C2_MacroAssembler::reduce4S (int opcode, Register dst, Register src1,
+                                  XMMRegister src2, XMMRegister vtmp1,
+                                  XMMRegister vtmp2){
+  assert(opcode == Op_AddReductionVS, "");
+  if (vtmp1 != src2) {
+    movdqu(vtmp1, src2);
+  }
+  phaddw(vtmp1, vtmp1);
+  reduce2S(opcode, dst, src1, vtmp1, vtmp1, vtmp2);
+}
+
+void C2_MacroAssembler::reduce8S(int opcode, Register dst, Register src1,
+                                 XMMRegister src2, XMMRegister vtmp1,
+                                 XMMRegister vtmp2) {
+  assert(opcode == Op_AddReductionVS, "");
+  if (vtmp1 != src2) {
+    movdqu(vtmp1, src2);
+  }
+  phaddw(vtmp1, vtmp1);
+  reduce4S(opcode, dst, src1, vtmp1, vtmp1, vtmp2);
+}
+
+void C2_MacroAssembler::reduce16S(int opcode, Register dst, Register src1,
+                                  XMMRegister src2, XMMRegister vtmp1,
+                                  XMMRegister vtmp2) {
+  assert(false, "not implemented for 256 bit vectors");
+  assert(opcode == Op_AddReductionVS, "");
+}
+
+void C2_MacroAssembler::reduce32S(int opcode, Register dst, Register src1,
+                                  XMMRegister src2, XMMRegister vtmp1,
+                                  XMMRegister vtmp2) {
+  assert(false, "not implemented for 256 bit vectors");
+  assert(opcode == Op_AddReductionVS, "");
+}
+
 
 void C2_MacroAssembler::reduce2I(int opcode, Register dst, Register src1, XMMRegister src2, XMMRegister vtmp1, XMMRegister vtmp2) {
   if (opcode == Op_AddReductionVI) {

@@ -698,9 +698,9 @@ int ReductionNode::opcode(int opc, BasicType bt) {
   int vopc = opc;
   switch (opc) {
     case Op_AddI:
-      assert(bt == T_INT, "must be");
-      vopc = Op_AddReductionVI;
-      break;
+      assert(bt == T_INT || bt == T_SHORT, "must be");
+      if (bt == T_SHORT) { vopc = Op_AddReductionVS; break; }
+      if (bt == T_INT)   { vopc = Op_AddReductionVI; break; }
     case Op_AddL:
       assert(bt == T_LONG, "must be");
       vopc = Op_AddReductionVL;
@@ -785,6 +785,7 @@ ReductionNode* ReductionNode::make(int opc, Node *ctrl, Node* n1, Node* n2, Basi
 
   switch (vopc) {
   case Op_AddReductionVI: return new AddReductionVINode(ctrl, n1, n2);
+  case Op_AddReductionVS: return new AddReductionVSNode(ctrl, n1, n2);
   case Op_AddReductionVL: return new AddReductionVLNode(ctrl, n1, n2);
   case Op_AddReductionVF: return new AddReductionVFNode(ctrl, n1, n2);
   case Op_AddReductionVD: return new AddReductionVDNode(ctrl, n1, n2);

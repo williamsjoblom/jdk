@@ -183,6 +183,16 @@ public:
   virtual uint ideal_reg() const { return Op_RegI; }
 };
 
+//------------------------------AddReductionVSNode--------------------------------------
+// Vector add short as a reduction
+class AddReductionVSNode : public ReductionNode {
+public:
+  AddReductionVSNode(Node * ctrl, Node* in1, Node* in2) : ReductionNode(ctrl, in1, in2) {}
+  virtual int Opcode() const;
+  virtual const Type* bottom_type() const { return TypeInt::SHORT; }
+  virtual uint ideal_reg() const { return Op_RegI; }
+};
+
 //------------------------------AddReductionVLNode--------------------------------------
 // Vector add long as a reduction
 class AddReductionVLNode : public ReductionNode {
