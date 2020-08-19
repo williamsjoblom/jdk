@@ -32,7 +32,7 @@ import java.util.Random;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(Scope.Thread)
 public abstract class VectorIdiom {
-    @Param({"5", "20", "512"})
+  @Param({"4", "8", "16", "20"})
     public int COUNT;
 
     private static byte[] bytesA;
@@ -46,7 +46,7 @@ public abstract class VectorIdiom {
     }
 
     @Benchmark
-    public  int stringHashCodeWrap() {
+    public int stringHashCodeWrap() {
         return stringHashCodea(bytesA);
     }
 
@@ -60,7 +60,8 @@ public abstract class VectorIdiom {
 
     @Fork(value = 1, jvmArgsPrepend = {
             "-XX:+SuperWordPolynomial",
-            "-XX:-Inline",
+            // "-XX:-Inline",
+
             //"-XX:LoopStripMiningIter=0",
             //"-XX:ObjectAlignmentInBytes=32",
             //"-XX:-CompactStrings"

@@ -73,7 +73,7 @@ class VectorNode : public TypeNode {
   virtual uint ideal_reg() const { return Matcher::vector_ideal_reg(vect_type()->length_in_bytes()); }
 
   static VectorNode* scalar2vector(Node* s, uint vlen, const Type* opd_t);
-  static VectorNode* scalars2vector(Node *n1, Node *n2);
+  static VectorNode* scalars2vector(Node *n1, Node *n2, BasicType bt);
   static VectorNode* shift_count(Node* shift, Node* cnt, uint vlen, BasicType bt);
   static VectorNode* make(int opc, Node* n1, Node* n2, uint vlen, BasicType bt);
   static VectorNode* make(int opc, Node* n1, Node* n2, Node* n3, uint vlen, BasicType bt);
@@ -877,20 +877,20 @@ public:
 
 //========================Load_Vector_With_Scalars===========================
 
-//------------------------------ReplicateINode---------------------------------
-// Replicate 2 long scalar to be vector
-class ConV4INode : public VectorNode {
+// 128 bit vector constant intiated from two long scalars.
+class ConV16Node : public VectorNode {
 public:
-  ConV4INode(Node *n1, Node *n2, const TypeVect *vt)
+  ConV16Node(Node *n1, Node *n2, const TypeVect *vt)
     : VectorNode(n1, n2, vt) {
     init_req(0, (Node*)Compile::current()->root());
   }
   virtual int Opcode() const;
 };
 
-class ConV8INode : public VectorNode {
+// 256 bit vector constant initiated from two ConV16.
+class ConV32Node : public VectorNode {
 public:
-  ConV8INode(Node *n1, Node *n2, const TypeVect *vt)
+  ConV32Node(Node *n1, Node *n2, const TypeVect *vt)
       : VectorNode(n1, n2, vt) {
     init_req(0, (Node*)Compile::current()->root());
   }

@@ -780,5 +780,8 @@
           "Do not use subtype check macro node")                            \
                                                                             \
   product(bool, SuperWordPolynomial, false,                                 \
-          "Use polynomial reduction support in superword")
+          "Use polynomial reduction support in superword")                  \
+                                                                            \
+  product(uintx, SuperWordPolynomialWidth, 32,                              \
+          "Target vector with for SuperWordPolynomial")
 #endif // SHARE_OPTO_C2_GLOBALS_HPP

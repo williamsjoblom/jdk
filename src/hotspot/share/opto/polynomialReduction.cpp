@@ -19,6 +19,7 @@
  ***************************************************************/
 VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, juint vec_size);
 VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size);
+jint my_pow(jint n, jint exp);
 
 /****************************************************************
  * Tracing.
@@ -35,13 +36,17 @@ enum TraceOpts {
   AllTraceOpts = 0xFFFFFFFF
 };
 
+// Enabled trace options.
+const int TRACE_OPTS = AllTraceOpts;
+
 // Maximum search depth for `find_node`.
 //
-// TODO: The current value of `20` is most likely too high.
+// TODO: The current value of `20` is most likely too high
+// and is likely to produce a significant performance hit.
 const uint MAX_SEARCH_DEPTH = 20;
 
-// Enabled traces
-const int TRACE_OPTS = Success | Failure;
+// TEMP: BasicType of recurrence variable.
+Type const *RECURR_T;
 
 #ifndef PRODUCT
 #define TRACE(OPT, BODY)                                                \
@@ -65,6 +70,12 @@ bool is_array_ptr(Node *n) {
 bool is_primitive_load(Node *n) {
   return n->is_Load() && is_java_primitive(n->bottom_type()->basic_type());
 }
+
+bool is_mul(Node *n) { return n->is_Mul(); }
+bool is_add(Node *n) { return n->is_Add(); }
+bool is_sub(Node *n) { return n->is_Sub(); }
+bool is_lshift(Node *n) { return n->Opcode() == Op_LShiftI || n->Opcode() == Op_LShiftL; }
+
 
 // Is this an binary operation.
 bool is_binop(Node *n) {
@@ -146,15 +157,15 @@ Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List &visited, uint 
 Node *find_rhs(PhiNode *reduction_phi) {
   return reduction_phi->in(2);
 
-  Node_List inputs;
-  for (uint i = PhiNode::Input; i < reduction_phi->len(); i++) {
-    inputs.push(reduction_phi->in(i));
-  }
+  // Node_List inputs;
+  // for (uint i = PhiNode::Input; i < reduction_phi->len(); i++) {
+  //   inputs.push(reduction_phi->in(i));
+  // }
 
-  Unique_Node_List visited;
-  Node *bottom = find_nodes(reduction_phi, inputs, visited);
+  // Unique_Node_List visited;
+  // Node *bottom = find_nodes(reduction_phi, inputs, visited);
 
-  return bottom;
+  // return bottom;
 }
 
 /****************************************************************
@@ -251,8 +262,7 @@ public:
           TRACE(Match, {
               tty->print("[OpcodePattern] Matching failed for in(%d)", i);
               n->dump();
-              next != NULL ? next->dump("  ") : tty->print("  NULL");
-              tty->print_cr("");
+              next != NULL ? next->dump("  found\n") : tty->print_cr("  NULL found");
             });
           set_ref(NULL, refs);
           return false;
@@ -503,7 +513,7 @@ struct LShiftPattern : BinOpPattern {
 
     Node *multiplier = phase->igvn().intcon(1 << _rhs->result()->get_int());
     Node *result = new MulVINode(lhs, make_vector(phase, multiplier, vlen),
-                                 TypeVect::make(T_INT, vlen));
+                                 TypeVect::make(RECURR_T->basic_type(), vlen));
     phase->igvn().register_new_node_with_optimizer(result);
     return result;
   }
@@ -523,21 +533,21 @@ bool match_shift_con_mul(Node *start, Node *of, ConMul &result) {
     N_REFS
   };
 
-  Pattern *l_shift = new OpcodePattern<3>
-    (Op_LShiftI,
+  Pattern *l_shift = new Pred2Pattern<3>
+    (is_lshift,
      ANY,
      new ExactNodePattern(of),
      new OpcodePattern<0>(Op_ConI, SHIFT_DISTANCE));
 
-  Pattern *shift_sub = new OpcodePattern<3>
-    (Op_SubI,
+  Pattern *shift_sub = new Pred2Pattern<3>
+    (is_sub,
      ANY,
      l_shift,
      new ExactNodePattern(of),
      SUB);
 
-  Pattern *shift_add = new OpcodePattern<3>
-    (Op_AddI,
+  Pattern *shift_add = new Pred2Pattern<3>
+    (is_add,
      ANY,
      l_shift,
      new ExactNodePattern(of),
@@ -657,10 +667,19 @@ ArrayLoadPattern *match_array_read(Node *start, Node *idx) {
       new OpcodePattern<0>(Op_ConL, ARRAY_BASE_OFFSET)),
       LOAD_NODE);
 
+
+  // NOTE: If we start at a ConvI2L, skip that node and force _bt to
+  // T_LONG.
+  bool is_long = false;
+  if (start->Opcode() == Op_ConvI2L) {
+    is_long = true;
+    start = start->in(1);
+  }
+
   if (p->match(start, refs)) {
     result->_load_ctrl = refs[LOAD_CTRL];
     result->_load = refs[LOAD_NODE];
-    result->_bt = result->_load->bottom_type()->basic_type();
+    result->_bt = is_long ? T_LONG : result->_load->bottom_type()->basic_type();
     result->_index = idx;
     result->_result = start;
     result->_array_ptr = refs[ARRAY];
@@ -729,6 +748,14 @@ PatternInstance *match(Node *start, Node *iv) {
   if (pi = match_scalar(start))
     return pi;
 
+  // // NOTE: Ignore conversions for now. Since we already know the type
+  // // of the recurrence variable these conversions are embedded within
+  // // our vector loads.
+  // if (start->Opcode() == Op_ConvI2L) {
+  //   assert(start->in(0) == NULL, "conversion has control");
+  //   return match(start->in(1), iv);
+  // }
+
   TRACE(Match, {
       tty->print_cr("Unable to find pattern instance.");
       tty->print("  "); start->dump(" start node");
@@ -742,55 +769,69 @@ PatternInstance *match(Node *start, Node *iv) {
  ****************************************************************/
 
 // Make int vector containing [init, init, ..., init]
+// TODO: Fix compatibility with basic types other than `T_INT`.
 VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, juint vec_size) {
   // TODO: Make vector type depend on recurrence variable type.
-  VectorNode *v = VectorNode::scalar2vector(init, vec_size, TypeInt::INT);
+  VectorNode *v = VectorNode::scalar2vector(init, vec_size, RECURR_T);
   phase->igvn().register_new_node_with_optimizer(v);
   return v;
 }
 
 // Make int vector containing [init, init, ..., init]
 VectorNode *make_vector(PhaseIdealLoop *phase, jint init, juint vec_size) {
-  ConNode *init_con = ConNode::make(TypeInt::make(init));
+  ConNode *init_con = RECURR_T->basic_type() == T_LONG
+    ? ConNode::make(TypeLong::make(init))
+    : ConNode::make(TypeInt::make(init));
+
   phase->igvn().register_new_node_with_optimizer(init_con);
   return make_vector(phase, init_con, vec_size);
 }
 
-// Make 4 int vector containing [n^{vlen}, n^{vlen-1}, ..., n^1, n^0].
-VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen) {
-  assert(vlen == 4 || vlen == 8, "expected");
+jlong exp_vector_part(int i, jint n, int elem_bytes) {
+  jlong result = 0;
+  jint next_n = my_pow(n, i * (sizeof(jlong) / elem_bytes));
+  for (uint i = 0; i < sizeof(jlong) / elem_bytes; i++) {
+    result = next_n | result << (elem_bytes*8);
+    next_n *= n;
+  }
+  return result;
+}
 
+// Make vector containing [n^{vlen}, n^{vlen-1}, ..., n^1, n^0].
+VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen, BasicType bt) {
   if (0 <= n && n <= 1) {
     // [0^3, 0^2, 0^1, 0^0] = [0, 0, 0, 0] and
     // [1^3, 1^2, 1^1, 1^0] = [1, 1, 1, 1]
     return make_vector(phase, n, vlen);
   }
 
+  int elem_bytes = type2aelembytes(bt);
+  int elem_bits = elem_bytes*8;
+  int vector_bytes = type2aelembytes(bt)*vlen;
+
+  assert(vector_bytes == 16 || vector_bytes == 32, "expected");
+
   // TODO: The following code need to be modified to support
   // big-endian systems, fixed by adjusting shift distances depending
   // on target endianness.
-  if (vlen == 4) {
-    ConNode *b = ConNode::make(TypeLong::make(((n * n * n)) | ((long)n * n << 32)));
-    ConNode *a = ConNode::make(TypeLong::make(n | ((long)1 << 32)));
-    VectorNode *con = VectorNode::scalars2vector(a, b);
+  if (vector_bytes == 16) {
+    ConNode *a = ConNode::make(TypeLong::make(exp_vector_part(0, n, elem_bytes)));
+    ConNode *b = ConNode::make(TypeLong::make(exp_vector_part(1, n, elem_bytes)));
+    VectorNode *con = VectorNode::scalars2vector(a, b, bt);
     phase->igvn().register_new_node_with_optimizer(a);
     phase->igvn().register_new_node_with_optimizer(b);
     phase->igvn().register_new_node_with_optimizer(con);
     return con;
-  } else if (vlen == 8) {
-    // NOTE: Integer overflow is expected here:
-    jlong a_value = n             | (((long)1)           << 32);
-    jlong b_value = n*n*n         | (((long)n*n)         << 32);
-    jlong c_value = n*n*n*n*n     | (((long)n*n*n*n)     << 32);
-    jlong d_value = n*n*n*n*n*n*n | (((long)n*n*n*n*n*n) << 32);
+  }
 
-    ConNode *a = ConNode::make(TypeLong::make(a_value));
-    ConNode *b = ConNode::make(TypeLong::make(b_value));
-    ConNode *c = ConNode::make(TypeLong::make(c_value));
-    ConNode *d = ConNode::make(TypeLong::make(d_value));
-    VectorNode *con_lo = VectorNode::scalars2vector(d, c);
-    VectorNode *con_hi = VectorNode::scalars2vector(b, a);
-    VectorNode *con = VectorNode::scalars2vector(con_lo, con_hi);
+  if (vector_bytes == 32) {
+    ConNode *a = ConNode::make(TypeLong::make(exp_vector_part(0, n, elem_bytes)));
+    ConNode *b = ConNode::make(TypeLong::make(exp_vector_part(1, n, elem_bytes)));
+    ConNode *c = ConNode::make(TypeLong::make(exp_vector_part(2, n, elem_bytes)));
+    ConNode *d = ConNode::make(TypeLong::make(exp_vector_part(3, n, elem_bytes)));
+    VectorNode *con_lo = VectorNode::scalars2vector(d, c, bt);
+    VectorNode *con_hi = VectorNode::scalars2vector(b, a, bt);
+    VectorNode *con = VectorNode::scalars2vector(con_lo, con_hi, bt);
     phase->igvn().register_new_node_with_optimizer(a);
     phase->igvn().register_new_node_with_optimizer(b);
     phase->igvn().register_new_node_with_optimizer(c);
@@ -916,22 +957,16 @@ void adjust_limit(CountedLoopNode *cl, PhaseIdealLoop *phase, Node *adjusted_lim
   const uint LIMIT = 2;
   Node *cmp = cl->loopexit()->cmp_node();
   assert(cmp != NULL && cmp->req() == 3, "no loop limit found");
-
-  // Node *limit = cmp->in(LIMIT);
-
-  // Node *new_stride = ConNode::make(TypeInt::make(vlen));
-  // Node *adjusted_limit = new SubINode(limit, new_stride);
-
-  // assert(adjusted_limit != NULL, "adj limit");
-
-  // phase->igvn().register_new_node_with_optimizer(new_stride);
-  // phase->igvn().register_new_node_with_optimizer(adjusted_limit);
-
   phase->igvn().replace_input_of(cmp, LIMIT, adjusted_limit);
 }
 
+bool check_cpu_features(uint vbytes, uint ) {
+  return true;
+}
+
 bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIterGVN *igvn, CountedLoopNode *cl) {
-  const juint VLEN = 8;
+  const juint VBYTES = SuperWordPolynomialWidth;
+
   Node *induction_phi = cl->phi();
   if (induction_phi == NULL) return false;
   TRACE(MinCond, {
@@ -959,7 +994,7 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   if (!match_con_mul(rhs->in(1), reduction_phi, con_mul)) {
     TRACE(Match, {
         tty->print_cr("Unable to find recurrence phi");
-        tty->print("  "); rhs->dump(" right hand side");
+        tty->print("  "); rhs->dump(" right hand side\n");
       });
 
     return false;
@@ -968,21 +1003,8 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   PatternInstance *pi = match(rhs->in(2), induction_phi);
   if (pi == NULL) return false;
 
-  // Build post-loop for the remaining iterations that does not fill
-  // up a full vector.
-  // Node *one = ConINode::make(1);
-  // Node *post_init_trip = new AddINode(cl->phi(), one);
-  // phase->igvn().register_new_node_with_optimizer(one);
-  // phase->igvn().register_new_node_with_optimizer(post_init_trip);
-
-  // NOTE: Post loop
-  // CountedLoopNode* post_head;
-  // {
-  //   Node_List old_new;
-  //   phase->insert_post_loop(lpt, old_new, cl, cl->loopexit(), cl->incr(),
-  //                           cl->limit(), post_head);
-  // }
-  // post_head->loopexit()->_prob = 1.0f / (VLEN - 1);
+  const BasicType recurrence_type = RECURR_T->basic_type(); //reduction_phi->bottom_type()->basic_type();
+  const juint VLEN = VBYTES / type2aelembytes(recurrence_type);
 
   // Adjust main loop stride and limit.
   Node *new_limit = split_loop(lpt, phase, cl, VLEN);
@@ -991,51 +1013,54 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 
   // first_aligned_element(, int target_alignment)
 
-  const uint VECTOR_BYTE_SIZE = VLEN * 4; // 4 4byte ints
-  if (C->max_vector_size() < VECTOR_BYTE_SIZE) {
-    C->set_max_vector_size(VECTOR_BYTE_SIZE);
+  if (C->max_vector_size() < VBYTES) {
+    C->set_max_vector_size(VBYTES);
   }
 
   // Node *out_phi = cl->find(155);
   // assert(out_phi->isa_Phi(), "a phi");
 
-  // Constant multiplier
+  // Constant multiplier.
   Node *mulv = make_vector(phase, my_pow(con_mul.multiplier, VLEN), VLEN);
 
   Node *arr = pi->generate(phase, VLEN); //build_array_load(phase, array_read, VLEN);
 
-  Node *initial_acc = new PromoteINode(reduction_phi->in(1), TypeVect::make(T_INT, VLEN)); // make_vector(phase, 0, VLEN);
+  Node *initial_acc = new PromoteINode(reduction_phi->in(1), TypeVect::make(RECURR_T->basic_type(), VLEN)); // make_vector(phase, 0, VLEN);
   phase->igvn().register_new_node_with_optimizer(initial_acc);
-  Node *m = make_exp_vector(phase, con_mul.multiplier, VLEN);
+  Node *m = make_exp_vector(phase, con_mul.multiplier, VLEN, RECURR_T->basic_type());
 
-  // NOTE: WAS reduction_phi->in(PhiNode::Region)
   Node *phi = PhiNode::make(induction_phi->in(PhiNode::Region), initial_acc);
   phase->igvn().register_new_node_with_optimizer(phi);
 
   // TODO: Investigate performance if replaced with vector x scalar
-  // multiplication (`mulv` is a vector of scalar duplicates).
+  // multiplication (`mulv` is a vector of scalar duplicates), it
+  // should peel of a few instructions from the main loop prologue.
   Node *mul0;
 
   // If we do not multiply our recurrence variable, don't create an
   // multiplication.
   if (con_mul.multiplier != 1) {
-    mul0 = new MulVINode(mulv, phi, TypeVect::make(T_INT, VLEN));
+    mul0 = new MulVINode(mulv, phi, TypeVect::make(RECURR_T->basic_type(), VLEN));
     phase->igvn().register_new_node_with_optimizer(mul0);
   } else {
      mul0 = phi;
   }
 
-  Node *mul1 = new MulVINode(arr, m, TypeVect::make(T_INT, VLEN));
+  Node *mul1 = new MulVLNode(arr, m, TypeVect::make(RECURR_T->basic_type(), VLEN));
   phase->igvn().register_new_node_with_optimizer(mul1);
 
-  Node *add = new AddVINode(mul0, mul1, TypeVect::make(T_INT, VLEN));
+  Node *add = new AddVLNode(mul0, mul1, TypeVect::make(RECURR_T->basic_type(), VLEN));
   phase->igvn().register_new_node_with_optimizer(add);
 
   phi->set_req(2, add);
 
-  // TODO: Replace with initial reduction phi value:
-  ConNode *reduce_base = ConNode::make(TypeInt::make(0));
-  Node *reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, add, T_INT);
+  ConNode *reduce_base;
+  if (RECURR_T->basic_type() == T_LONG)
+    reduce_base = ConNode::make(TypeLong::make(0));
+  else
+    reduce_base = ConNode::make(TypeInt::make(0));
+
+  Node *reduce = ReductionNode::make(Op_AddL, NULL, reduce_base, add, RECURR_T->basic_type());
 
   phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
   phase->igvn().register_new_node_with_optimizer(reduce, NULL);
@@ -1078,6 +1103,8 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 }
 
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
+  RECURR_T = TypeLong::LONG;
+
   if (!SuperWordPolynomial) return false;
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();

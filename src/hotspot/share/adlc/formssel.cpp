@@ -4169,7 +4169,7 @@ bool MatchRule::is_vector() const {
     "PromoteI",
     "RoundDoubleModeV","LoadVector", "StoreVector",
     "LoadUBVector", "LoadBVector", "LoadUSVector", "LoadSVector", "LoadIVector",
-    "FmaVD", "FmaVF","PopCountVI", "ConV4I", "ConV8I",
+    "FmaVD", "FmaVF","PopCountVI", "ConV16", "ConV32",
     // Next are not supported currently.
     "PackB","PackS","PackI","PackL","PackF","PackD","Pack2L","Pack2D",
     "ExtractB","ExtractUB","ExtractC","ExtractS","ExtractI","ExtractL","ExtractF","ExtractD"

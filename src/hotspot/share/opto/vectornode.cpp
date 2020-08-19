@@ -469,17 +469,17 @@ VectorNode* VectorNode::scalar2vector(Node* s, uint vlen, const Type* opd_t) {
 }
 
 // Scalar promotion
-VectorNode* VectorNode::scalars2vector(Node *n1, Node *n2) {
+VectorNode* VectorNode::scalars2vector(Node *n1, Node *n2, BasicType bt) {
   // BasicType bt = opd_t->array_element_basic_type();
   // const TypeVect* vt = opd_t->singleton() ? TypeVect::make(opd_t, 4)
   //                                         : TypeVect::make(bt, 4);
 
   // assert(bt == T_INT, "not implemented");
-  if (n1->Opcode() == Op_ConV4I && n2->Opcode() == Op_ConV4I) {
-    return new ConV8INode(n1, n2, TypeVect::make(T_INT, 8));
+  if (n1->Opcode() == Op_ConV16 && n2->Opcode() == Op_ConV16) {
+    return new ConV32Node(n1, n2, TypeVect::make(bt, 32 / type2aelembytes(bt)));
   } else {
     assert(n1->Opcode() == Op_ConL && n2->Opcode() == Op_ConL, "expected");
-    return new ConV4INode(n1, n2, TypeVect::make(T_INT, 4));
+    return new ConV16Node(n1, n2, TypeVect::make(bt, 16 / type2aelembytes(bt)));
   }
 }
 
