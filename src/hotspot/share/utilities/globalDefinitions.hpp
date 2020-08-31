@@ -767,25 +767,35 @@ class JavaValue {
     _value.d = value;
   }
 
- jfloat get_jfloat() const { return _value.f; }
- jdouble get_jdouble() const { return _value.d; }
- jint get_jint() const { return _value.i; }
- jlong get_jlong() const { return _value.l; }
- jobject get_jobject() const { return _value.h; }
- JavaCallValue* get_value_addr() { return &_value; }
- BasicType get_type() const { return _type; }
+  JavaValue(jint value, BasicType t=T_INT) {
+    _type    = t;
+    _value.i = value;
+  }
 
- void set_jfloat(jfloat f) { _value.f = f;}
- void set_jdouble(jdouble d) { _value.d = d;}
- void set_jint(jint i) { _value.i = i;}
- void set_jlong(jlong l) { _value.l = l;}
- void set_jobject(jobject h) { _value.h = h;}
- void set_type(BasicType t) { _type = t; }
+  JavaValue(jlong value) {
+    _type    = T_LONG;
+    _value.l = value;
+  }
 
- jboolean get_jboolean() const { return (jboolean) (_value.i);}
- jbyte get_jbyte() const { return (jbyte) (_value.i);}
- jchar get_jchar() const { return (jchar) (_value.i);}
- jshort get_jshort() const { return (jshort) (_value.i);}
+  jfloat get_jfloat() const { return _value.f; }
+  jdouble get_jdouble() const { return _value.d; }
+  jint get_jint() const { return _value.i; }
+  jlong get_jlong() const { return _value.l; }
+  jobject get_jobject() const { return _value.h; }
+  JavaCallValue *get_value_addr() { return &_value; }
+  BasicType get_type() const { return _type; }
+
+  void set_jfloat(jfloat f) { _value.f = f; }
+  void set_jdouble(jdouble d) { _value.d = d; }
+  void set_jint(jint i) { _value.i = i; }
+  void set_jlong(jlong l) { _value.l = l; }
+  void set_jobject(jobject h) { _value.h = h; }
+  void set_type(BasicType t) { _type = t; }
+
+  jboolean get_jboolean() const { return (jboolean)(_value.i); }
+  jbyte get_jbyte() const { return (jbyte)(_value.i); }
+  jchar get_jchar() const { return (jchar)(_value.i); }
+  jshort get_jshort() const { return (jshort)(_value.i); }
 
 };
 

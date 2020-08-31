@@ -18,8 +18,9 @@
  * Forward declarations.
  ***************************************************************/
 VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, const Type *recurr_t, juint vec_size);
-VectorNode *make_vector(PhaseIdealLoop *phase, jint init, const Type *recurr_t, juint vec_size);
-jint my_pow(jint n, jint exp);
+VectorNode *make_vector(PhaseIdealLoop *phase, jlong init, const Type *recurr_t, juint vec_size);
+template<typename T>
+T my_pow(T n, jint exp);
 
 /****************************************************************
  * Tracing.
@@ -37,7 +38,7 @@ enum TraceOpts {
 };
 
 // Enabled trace options.
-const int TRACE_OPTS = AllTraceOpts;
+const int TRACE_OPTS = FinalReport;
 
 // Maximum search depth for `find_node`.
 //
@@ -86,6 +87,12 @@ bool is_binop(Node *n) {
   case Op_DivI:
   case Op_LShiftI:
     return true;
+  case Op_AddF:
+  case Op_SubF:
+  case Op_MulF:
+  case Op_DivF:
+    return true;
+
   default:
     return false;
   }
@@ -444,8 +451,8 @@ struct ArrayLoadPattern : PatternInstance {
     BasicType elem_type = load->memory_type();
 
     TRACE(Rewrite, {
-        tty->print_cr("load: %s, elem: %s", type2name(load_type),
-                      type2name(elem_type));
+        tty->print_cr("load: %s, elem: %s, recur: %s", type2name(load_type),
+                      type2name(elem_type), type2name(recurr_bt));
       });
 
     // No implicit cast.
@@ -525,12 +532,18 @@ struct LShiftPattern : BinOpPattern {
 };
 
 struct ConMul {
-  jint multiplier;
+  JavaValue multiplier;
+};
+
+enum ConMulResult {
+  NOT_FOUND = 0,
+  IDENTITY = 1,
+  NOT_IDENTITY = 2,
 };
 
 // Match `of` multiplied by a constant that has been rewritten as a
 // shift and an add/sub.
-bool match_shift_con_mul(Node *start, Node *of, ConMul &result) {
+ConMulResult match_shift_con_mul(Node *start, Node *of, JavaValue &result) {
   enum {
     SHIFT_DISTANCE,
     SUB,
@@ -562,68 +575,89 @@ bool match_shift_con_mul(Node *start, Node *of, ConMul &result) {
 
   MatchRefs refs(N_REFS);
   if (shift->match(start, refs)) {
-    result.multiplier = (1 << refs[SHIFT_DISTANCE]->get_int());
+    jlong multiplier = (1 << refs[SHIFT_DISTANCE]->get_int());
     if (refs[SUB]) {
-      result.multiplier--;
+      multiplier--;
     } else if (refs[ADD]) {
-      result.multiplier++;
+      multiplier++;
     }
 
-    return true;
+    result = JavaValue(multiplier);
+    return NOT_IDENTITY; //ConNode::make(TypeInt::make(multiplier));
   } else {
     TRACE(Match, {
         tty->print_cr("  origin shift_con_mul");
       });
-
-    return false;
+    return NOT_FOUND;
   }
 }
 
-bool match_trivial_con_mul(Node *start, Node *of, ConMul &result) {
+ConMulResult match_trivial_con_mul(Node *start, Node *of, JavaValue &result) {
   enum {
     MUL,
     N_REFS
   };
 
-  Pattern *mul = new OpcodePattern<3>
+  MatchRefs refs(N_REFS);
+  Pattern *int_mul = new OpcodePattern<3>
     (Op_MulI,
      ANY,
      new ExactNodePattern(of),
      new OpcodePattern<0>(Op_ConI, MUL));
 
-  MatchRefs refs(N_REFS);
-  if (mul->match(start, refs)) {
-    result.multiplier = refs[MUL]->get_int();
-    return true;
-  } else {
-    return false;
+  if (int_mul->match(start, refs)) {
+    result = refs[MUL]->get_int();
+    return NOT_IDENTITY;
   }
+
+  Pattern *float_mul = new OpcodePattern<3>
+    (Op_MulF,
+     ANY,
+     new ExactNodePattern(of),
+     new OpcodePattern<0>(Op_ConF, MUL));
+
+  if (float_mul->match(start, refs)) {
+    result = JavaValue(refs[MUL]->getf());
+    return NOT_IDENTITY;
+  }
+
+  return NOT_FOUND;
 }
 
-bool match_identity_con_mul(Node *start, Node *of, ConMul &result) {
+ConMulResult match_identity_con_mul(Node *start, Node *of, JavaValue &result) {
   if (start == of) {
-    result.multiplier = 1;
-    return true;
+    result = JavaValue(1);
+    return IDENTITY;
   } else {
     TRACE(Match, {
         tty->print_cr("  origin identity_con_mul");
       });
-    return false;
+    return NOT_FOUND;
   }
 }
 
 // Match multiplication of `of` and a constant placing the constant in
 // `result`.
-bool match_con_mul(Node *start, Node *of, ConMul &result) {
-  return
-    match_identity_con_mul(start, of, result) ||
-    match_shift_con_mul(start, of, result) ||
-    match_trivial_con_mul(start, of, result);
+ConMulResult match_con_mul(Node *start, Node *of, JavaValue &result) {
+  if (ConMulResult r = match_identity_con_mul(start, of, result))
+    return r;
+  if (ConMulResult r = match_shift_con_mul(start, of, result))
+    return r;
+  if (ConMulResult r = match_trivial_con_mul(start, of, result))
+    return r;
+
+  return NOT_FOUND;
 }
 
 // Match demotion of integer to byte/short, returning the node being
 // demoted and setting `bt` to the resulting type of the demotion.
 Node *match_int_demotion(Node *start, BasicType& bt) {
+  // TODO: Look for float type instead of opcode.
+  if (start->Opcode() == Op_AddF) {
+    bt = T_FLOAT;
+    return start;
+  }
+
   if (start->Opcode() != Op_RShiftI ||
       start->in(1)->Opcode() != Op_LShiftI ||
       start->in(2)->Opcode() != Op_ConI ||
@@ -757,7 +791,7 @@ PatternInstance *match_scalar(Node *start) {
   // NOTE: Assumes the scalar to be loop invariant. Presence of loop
   // variant scalars should exit idiom vectorization early. To account
   // for this, we currently only accept scalar constants.
-  if (start->Opcode() == Op_ConI) {
+  if (start->Opcode() == Op_ConI || start->Opcode() == Op_ConF) {
     ScalarPattern *p = new ScalarPattern();
     p->_scalar = start;
     return p;
@@ -794,6 +828,72 @@ PatternInstance *match(Node *start, Node *iv) {
 /****************************************************************
  * Utility.
  ****************************************************************/
+int mul_opcode(BasicType bt) {
+  switch (bt) {
+  case T_BOOLEAN:
+  case T_BYTE:
+  case T_CHAR:
+  case T_SHORT:
+  case T_INT:
+    return Op_MulI;
+  case T_FLOAT:
+    return Op_MulF;
+  case T_DOUBLE:
+    return Op_MulD;
+  default:
+    ShouldNotReachHere();
+    return 0;
+  }
+}
+
+int add_opcode(BasicType bt) {
+  switch (bt) {
+  case T_BOOLEAN:
+  case T_BYTE:
+  case T_CHAR:
+  case T_SHORT:
+  case T_INT:
+    return Op_AddI;
+  case T_FLOAT:
+    return Op_AddF;
+  case T_DOUBLE:
+    return Op_AddD;
+  default:
+    ShouldNotReachHere();
+    return 0;
+  }
+}
+
+// n^exp
+template<typename T>
+T my_pow(T n, jint exp) {
+  T result = 1;
+  while (exp--) {
+    result *= n;
+  }
+  return result;
+}
+
+JavaValue make_pow(JavaValue n, jint exp, BasicType bt) {
+  switch (bt) {
+  case T_BYTE:
+  case T_BOOLEAN:
+  case T_CHAR:
+  case T_SHORT:
+  case T_INT:
+    return JavaValue(my_pow<jint>(n.get_jint(), exp));
+  case T_LONG:
+    return JavaValue(my_pow<jlong>(n.get_jlong(), exp));
+  case T_FLOAT:
+    return JavaValue(my_pow<jfloat>(n.get_jfloat(), exp));
+  case T_DOUBLE:
+    return JavaValue(my_pow<jdouble>(n.get_jdouble(), exp));
+  default:
+    ShouldNotReachHere();
+    return 0;
+  }
+}
+
 
 // Make int vector containing [init, init, ..., init]
 // TODO: Fix compatibility with basic types other than `T_INT`.
@@ -806,34 +906,63 @@ VectorNode *make_vector(PhaseIdealLoop *phase, Node *init, const Type *recurr_t,
 }
 
 // Make int vector containing [init, init, ..., init]
-VectorNode *make_vector(PhaseIdealLoop *phase, jint init, const Type *recurr_t, juint vec_size) {
-  ConNode *init_con = recurr_t->basic_type() == T_LONG
-    ? ConNode::make(TypeLong::make(init))
-    : ConNode::make(TypeInt::make(init));
+VectorNode *make_vector(PhaseIdealLoop *phase, JavaValue init, const Type *recurr_t, juint vec_size) {
+  ConNode *init_con;
+  if (recurr_t->basic_type() == T_LONG) {
+    init_con = ConNode::make(TypeLong::make(init.get_jlong()));
+  } else if (recurr_t->basic_type() == T_INT) {
+    init_con = ConNode::make(TypeInt::make(init.get_jint()));
+  } else if (recurr_t->basic_type() == T_FLOAT) {
+    init_con = ConNode::make(TypeF::make(init.get_jfloat()));
+  } else {
+    ShouldNotReachHere();
+  }
 
   phase->igvn().register_new_node_with_optimizer(init_con);
   return make_vector(phase, init_con, recurr_t, vec_size);
 }
 
-jlong exp_vector_part(int i, jint n, int elem_bytes) {
+template<typename T>
+jlong exp_vector_part(int i, T n, int elem_bytes) {
   jlong mask = (1l << elem_bytes*8) - 1;
 
   jlong result = 0;
-  jlong next_n = my_pow(n, i * (sizeof(jlong) / elem_bytes));
+  T next_n = my_pow<T>(n, i * (sizeof(jlong) / elem_bytes));
   for (uint i = 0; i < sizeof(jlong) / elem_bytes; i++) {
-    result = (next_n & mask) | (result << (elem_bytes*8));
+    JavaValue next_jvalue(next_n);
+    result = (next_jvalue.get_jlong() & mask) | (result << (elem_bytes*8));
     next_n *= n;
   }
   return result;
 }
 
-// Make vector containing [n^{vlen}, n^{vlen-1}, ..., n^1, n^0].
-VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen, const Type *t) {
-  if (0 <= n && n <= 1) {
-    // [0^3, 0^2, 0^1, 0^0] = [0, 0, 0, 0] and
-    // [1^3, 1^2, 1^1, 1^0] = [1, 1, 1, 1]
-    return make_vector(phase, n, t, vlen);
+jlong make_exp_vector_part(int i, JavaValue n, int elem_bytes, BasicType bt) {
+  switch (bt) {
+  case T_BYTE:
+  case T_BOOLEAN:
+  case T_CHAR:
+  case T_SHORT:
+  case T_INT:
+    return exp_vector_part(i, n.get_jint(), elem_bytes);
+  case T_LONG:
+    return exp_vector_part(i, n.get_jlong(), elem_bytes);
+  case T_FLOAT:
+    return exp_vector_part(i, n.get_jfloat(), elem_bytes);
+  case T_DOUBLE:
+    return exp_vector_part(i, n.get_jdouble(), elem_bytes);
+  default:
+    ShouldNotReachHere();
+    return 0;
   }
+}
+
+// Make vector containing [n^{vlen}, n^{vlen-1}, ..., n^1, n^0].
+VectorNode *make_exp_vector(PhaseIdealLoop *phase, JavaValue n, juint vlen, const Type *t) {
+  // if (0 <= n && n <= 1) {
+  //   // [0^3, 0^2, 0^1, 0^0] = [0, 0, 0, 0] and
+  //   // [1^3, 1^2, 1^1, 1^0] = [1, 1, 1, 1]
+  //   return make_vector(phase, n, t, vlen);
+  // }
 
   BasicType bt = t->array_element_basic_type();
   int elem_bytes = type2aelembytes(bt);
@@ -846,8 +975,8 @@ VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen, const Typ
   // big-endian systems, fixed by adjusting shift distances depending
   // on target endianness.
   if (vector_bytes == 16) {
-    ConNode *a = ConNode::make(TypeLong::make(exp_vector_part(0, n, elem_bytes)));
-    ConNode *b = ConNode::make(TypeLong::make(exp_vector_part(1, n, elem_bytes)));
+    ConNode *a = ConNode::make(TypeLong::make(make_exp_vector_part(0, n, elem_bytes, bt)));
+    ConNode *b = ConNode::make(TypeLong::make(make_exp_vector_part(1, n, elem_bytes, bt)));
     VectorNode *con = VectorNode::scalars2vector(a, b, bt);
     phase->igvn().register_new_node_with_optimizer(a);
     phase->igvn().register_new_node_with_optimizer(b);
@@ -856,10 +985,10 @@ VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen, const Typ
   }
 
   if (vector_bytes == 32) {
-    ConNode *a = ConNode::make(TypeLong::make(exp_vector_part(0, n, elem_bytes)));
-    ConNode *b = ConNode::make(TypeLong::make(exp_vector_part(1, n, elem_bytes)));
-    ConNode *c = ConNode::make(TypeLong::make(exp_vector_part(2, n, elem_bytes)));
-    ConNode *d = ConNode::make(TypeLong::make(exp_vector_part(3, n, elem_bytes)));
+    ConNode *a = ConNode::make(TypeLong::make(make_exp_vector_part(0, n, elem_bytes, bt)));
+    ConNode *b = ConNode::make(TypeLong::make(make_exp_vector_part(1, n, elem_bytes, bt)));
+    ConNode *c = ConNode::make(TypeLong::make(make_exp_vector_part(2, n, elem_bytes, bt)));
+    ConNode *d = ConNode::make(TypeLong::make(make_exp_vector_part(3, n, elem_bytes, bt)));
     VectorNode *con_lo = VectorNode::scalars2vector(d, c, bt);
     VectorNode *con_hi = VectorNode::scalars2vector(b, a, bt);
     VectorNode *con = VectorNode::scalars2vector(con_lo, con_hi, bt);
@@ -875,15 +1004,6 @@ VectorNode *make_exp_vector(PhaseIdealLoop *phase, jint n, juint vlen, const Typ
 
   ShouldNotReachHere();
   return NULL;
-}
-
-// n^exp
-jint my_pow(jint n, jint exp) {
-  jint result = 1;
-  while (exp--) {
-    result *= n;
-  }
-  return result;
 }
 
 // // Build vector array load from a matched ArrayRead.
@@ -1048,11 +1168,14 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   Node *start = match_int_demotion(rhs, recurr_bt);
   const Type *recurr_t = Type::get_const_basic_type(recurr_bt);
 
-  ConMul con_mul;
+
+  // TODO: MONDAY, use a constant instead.
+  JavaValue con_mul;
+  ConMulResult matched_con_mul = match_con_mul(start->in(1), reduction_phi, con_mul);
   //ArrayLoadPattern *array_read = match_array_read(rhs->in(2), induction_phi);
-  if (!match_con_mul(start->in(1), reduction_phi, con_mul)) {
+  if (matched_con_mul == NOT_FOUND) {
     TRACE(Match, {
-        tty->print_cr("Unable to find recurrence phi");
+        tty->print_cr("Unable to find N");
         tty->print("  "); rhs->dump(" right hand side\n");
       });
 
@@ -1069,8 +1192,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   set_stride(cl, phase, VLEN);
   adjust_limit(cl, phase, new_limit);
 
-  // first_aligned_element(, int target_alignment)
-
   if (C->max_vector_size() < VBYTES) {
     C->set_max_vector_size(VBYTES);
   }
@@ -1079,13 +1200,13 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // assert(out_phi->isa_Phi(), "a phi");
 
   // Constant multiplier.
-  Node *mulv = make_vector(phase, my_pow(con_mul.multiplier, VLEN), recurr_t, VLEN);
+  Node *mulv = make_vector(phase, make_pow(con_mul, VLEN, recurr_bt), recurr_t, VLEN);
 
   Node *arr = pi->generate(phase, recurr_t, VLEN); //build_array_load(phase, array_read, VLEN);
 
-  Node *initial_acc = new PromoteINode(reduction_phi->in(1), TypeVect::make(recurr_bt, VLEN)); // make_vector(phase, 0, VLEN);
+  Node *initial_acc = new PromoteNode(reduction_phi->in(1), TypeVect::make(recurr_bt, VLEN)); // make_vector(phase, 0, VLEN);
   phase->igvn().register_new_node_with_optimizer(initial_acc);
-  Node *m = make_exp_vector(phase, con_mul.multiplier, VLEN, recurr_t);
+  Node *m = make_exp_vector(phase, con_mul, VLEN, recurr_t);
 
   Node *phi = PhiNode::make(induction_phi->in(PhiNode::Region), initial_acc);
   phase->igvn().register_new_node_with_optimizer(phi);
@@ -1095,35 +1216,45 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
   // should peel of a few instructions from the main loop prologue.
   Node *mul0;
 
+  int op_mul = mul_opcode(recurr_bt); //recurr_bt == T_INT ? Op_MulI : Op_MulF;
+  int op_add = add_opcode(recurr_bt); //recurr_bt == T_INT ? Op_AddI : Op_AddF;
+
   // If we do not multiply our recurrence variable, don't create an
   // multiplication.
-  if (con_mul.multiplier != 1) {
-    mul0 = VectorNode::make(Op_MulI, mulv, phi, VLEN, recurr_bt); //new MulVINode(mulv, phi, TypeVect::make(recurr_bt, VLEN));
+  if (matched_con_mul != IDENTITY) {
+    mul0 = VectorNode::make(op_mul, mulv, phi, VLEN, recurr_bt); //new MulVINode(mulv, phi, TypeVect::make(recurr_bt, VLEN));
     phase->igvn().register_new_node_with_optimizer(mul0);
   } else {
      mul0 = phi;
   }
 
-  Node *mul1 = VectorNode::make(Op_MulI, arr, m, VLEN, recurr_bt); //new MulVINode(arr, m, TypeVect::make(recurr_bt, VLEN));
+  Node *mul1 = VectorNode::make(op_mul, arr, m, VLEN, recurr_bt); //new MulVINode(arr, m, TypeVect::make(recurr_bt, VLEN));
   phase->igvn().register_new_node_with_optimizer(mul1);
 
-  Node *add = VectorNode::make(Op_AddI, mul0, mul1, VLEN, recurr_bt); //AddVINode(mul0, mul1, TypeVect::make(recurr_bt, VLEN));
+  Node *add = VectorNode::make(op_add, mul0, mul1, VLEN, recurr_bt); //AddVINode(mul0, mul1, TypeVect::make(recurr_bt, VLEN));
   phase->igvn().register_new_node_with_optimizer(add);
 
   phi->set_req(2, add);
 
-
+  // TODO: factor out:
   Node *reduce;
   if (recurr_bt == T_LONG) {
     ConNode *reduce_base = ConNode::make(TypeLong::make(0));
-    phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
+    phase->igvn().register_new_node_with_optimizer(reduce_base);
     reduce = ReductionNode::make(Op_AddL, NULL, reduce_base, add, recurr_bt);
-  } else {
+  } else if (recurr_bt == T_INT || recurr_bt == T_SHORT || recurr_bt == T_CHAR ||
+             recurr_bt == T_BYTE || recurr_bt == T_BOOLEAN) {
     ConNode *reduce_base = ConNode::make(TypeInt::make(0));
-    phase->igvn().register_new_node_with_optimizer(reduce_base, NULL);
+    phase->igvn().register_new_node_with_optimizer(reduce_base);
     reduce = ReductionNode::make(Op_AddI, NULL, reduce_base, add, recurr_bt);
+  } else if (recurr_bt == T_FLOAT) {
+    ConNode *reduce_base = ConNode::make(TypeF::make(0));
+    phase->igvn().register_new_node_with_optimizer(reduce_base);
+    reduce = ReductionNode::make(Op_AddF, NULL, reduce_base, add, recurr_bt);
+  } else {
+    ShouldNotReachHere();
   }
-  phase->igvn().register_new_node_with_optimizer(reduce, NULL);
+  phase->igvn().register_new_node_with_optimizer(reduce);
 
   // Node *opq = new Opaque1Node(C, reduction_phi->in(1));
   // phase->igvn().register_new_node_with_optimizer(opq);
@@ -1163,8 +1294,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
 }
 
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
-  // RECURR_T = TypeInt::SHORT;
-
   if (!SuperWordPolynomial) return false;
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
@@ -1177,8 +1306,8 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
                     C->method()->get_Method()->name()->as_utf8());
     });
 
-  if (!cl->stride_is_con()) return false;
-  TRACE(Candidates, { tty->print_cr("  Loop is constant stride"); });
+  if (!cl->stride_is_con() || cl->stride_con() != 1) return false;
+  TRACE(Candidates, { tty->print_cr("  Loop is constant unit-stride"); });
 
   // NOTE: Do we need/want this one?
   if (cl->range_checks_present()) return false;

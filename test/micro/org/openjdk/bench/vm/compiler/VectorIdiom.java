@@ -32,7 +32,7 @@ import java.util.Random;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(Scope.Thread)
 public abstract class VectorIdiom {
-  @Param({"4", "8", "16", "20"})
+  @Param({"2", "4", "8", "16", "32", "64", "128"})
     public int COUNT;
 
     private static byte[] bytesA;
@@ -60,19 +60,18 @@ public abstract class VectorIdiom {
 
     @Fork(value = 1, jvmArgsPrepend = {
             "-XX:+SuperWordPolynomial",
-            // "-XX:-Inline",
-
-            //"-XX:LoopStripMiningIter=0",
-            //"-XX:ObjectAlignmentInBytes=32",
-            //"-XX:-CompactStrings"
-            //"-XX:LoopMaxUnroll=0",
-            // "-XX:+UnlockDiagnosticVMOptions",
-            // "-XX:PrintAssemblyOptions=intel",
+            "-XX:SuperWordPolynomialWidth=16"
         })
-    public static class WithSuperword extends VectorIdiom { }
+    public static class WithXMMSuperword extends VectorIdiom { }
+
+    @Fork(value = 1, jvmArgsPrepend = {
+      "-XX:+SuperWordPolynomial",
+      "-XX:SuperWordPolynomialWidth=32"
+    })
+    public static class WithYMMSuperword extends VectorIdiom { }
 
     @Fork(value = 1, jvmArgsPrepend = {
             "-XX:-SuperWordPolynomial"})
-    public static class NoSuperword extends VectorIdiom { }
+    public static class XNoSuperword extends VectorIdiom { }
 
 }

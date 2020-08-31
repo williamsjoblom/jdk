@@ -187,9 +187,9 @@ void ConstantTable::add(Constant& con) {
   (void) _constants.append(con);
 }
 
-ConstantTable::Constant ConstantTable::add(MachConstantNode* n, BasicType type, jvalue value, int required_align) {
+ConstantTable::Constant ConstantTable::add(MachConstantNode* n, BasicType type, jvalue value, int required_align, bool can_be_reused) {
   Block* b = Compile::current()->cfg()->get_block_for_node(n);
-  Constant con(type, value, b->_freq, true, required_align);
+  Constant con(type, value, b->_freq, can_be_reused, required_align);
   add(con);
   return con;
 }

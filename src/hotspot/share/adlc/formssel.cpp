@@ -4042,7 +4042,7 @@ int MatchRule::is_expensive() const {
         strcmp(opType,"ReplicateL")==0 ||
         strcmp(opType,"ReplicateF")==0 ||
         strcmp(opType,"ReplicateD")==0 ||
-        strcmp(opType,"PromoteINode")==0 ||
+        strcmp(opType,"PromoteNode")==0 ||
         strcmp(opType,"AddReductionVI")==0 ||
         strcmp(opType,"AddReductionVS")==0 ||
         strcmp(opType,"AddReductionVL")==0 ||
@@ -4167,7 +4167,7 @@ bool MatchRule::is_vector() const {
     "RShiftVB","RShiftVS","RShiftVI","RShiftVL",
     "URShiftVB","URShiftVS","URShiftVI","URShiftVL",
     "ReplicateB","ReplicateS","ReplicateI","ReplicateL","ReplicateF","ReplicateD",
-    "PromoteI",
+    "Promote",
     "RoundDoubleModeV","LoadVector", "StoreVector",
     "LoadUBVector", "LoadBVector", "LoadUSVector", "LoadSVector", "LoadIVector",
     "FmaVD", "FmaVF","PopCountVI", "ConV16", "ConV32",

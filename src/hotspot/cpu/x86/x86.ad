@@ -3955,7 +3955,7 @@ instruct ReplD_zero(vec dst, immD0 zero) %{
 // ====================PromoteI=======================================
 
 instruct PromI_reg(vec dst, rRegI src) %{
-  match(Set dst (PromoteI src));
+  match(Set dst (Promote src));
   format %{ "promoteI $dst,$src" %}
   ins_encode %{
     uint vlen = vector_length(this);
@@ -3968,7 +3968,7 @@ instruct PromI_reg(vec dst, rRegI src) %{
 %}
 
 instruct PromL_reg(vec dst, rRegL src) %{
-  match(Set dst (PromoteI src));
+  match(Set dst (Promote src));
   format %{ "promoteL $dst,$src" %}
   ins_encode %{
     uint vlen = vector_length(this);
@@ -3979,6 +3979,21 @@ instruct PromL_reg(vec dst, rRegL src) %{
   %}
   ins_pipe( pipe_slow );
 %}
+
+instruct PromF_reg(vec dst, vlRegF src) %{
+  match(Set dst (Promote src));
+  format %{ "promoteF $dst,$src" %}
+  ins_encode %{
+    uint vlen = vector_length(this);
+
+    int vlen_enc = vector_length_encoding(this);
+    __ vpxor($dst$$XMMRegister, $dst$$XMMRegister, $dst$$XMMRegister, vlen_enc);
+    // Force single-single move to not dirty touch the rest of the register.
+    __ movflt($dst$$XMMRegister, $src$$XMMRegister, true);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
 
 // ====================REDUCTION ARITHMETIC=======================================
 // ======================Short Reduction==========================================

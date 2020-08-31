@@ -294,7 +294,7 @@ bool VectorNode::is_invariant_vector(Node* n) {
   case Op_ReplicateL:
   case Op_ReplicateF:
   case Op_ReplicateD:
-  case Op_PromoteI:
+  case Op_Promote:
     return true;
   default:
     return false;

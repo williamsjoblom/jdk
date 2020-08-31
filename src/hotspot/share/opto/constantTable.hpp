@@ -130,7 +130,7 @@ public:
   int  find_offset(Constant& con) const;
 
   void     add(Constant& con);
-  Constant add(MachConstantNode* n, BasicType type, jvalue value, int required_align=-1);
+  Constant add(MachConstantNode* n, BasicType type, jvalue value, int required_align=-1, bool can_be_reused=true);
   Constant add(Metadata* metadata);
   Constant add(MachConstantNode* n, MachOper* oper);
   Constant add(MachConstantNode* n, jint i) {
@@ -145,20 +145,21 @@ public:
     // Double quadword with 16 byte alignment.
     jvalue avalue; avalue.j = a;
     jvalue bvalue; bvalue.j = b;
-    Constant ca = add(n, T_LONG, avalue, 16);
-    Constant cb = add(n, T_LONG, bvalue);
+    Constant ca = add(n, T_LONG, avalue, 16, false);
+    Constant cb = add(n, T_LONG, bvalue, -1, false);
     return ca;
   }
   Constant add(MachConstantNode *n, jlong a, jlong b, jlong c, jlong d) {
     // Quad quadword with 32 byte alignment.
+    // Disallow reuse to ensure
     jvalue avalue; avalue.j = a;
     jvalue bvalue; bvalue.j = b;
     jvalue cvalue; cvalue.j = c;
     jvalue dvalue; dvalue.j = d;
-    Constant ca = add(n, T_LONG, avalue, 32);
-    Constant cb = add(n, T_LONG, bvalue);
-    Constant cc = add(n, T_LONG, cvalue);
-    Constant cd = add(n, T_LONG, dvalue);
+    Constant ca = add(n, T_LONG, avalue, 32, false);
+    Constant cb = add(n, T_LONG, bvalue, -1, false);
+    Constant cc = add(n, T_LONG, cvalue, -1, false);
+    Constant cd = add(n, T_LONG, dvalue, -1, false);
     return ca;
   }
   Constant add(MachConstantNode* n, jfloat f) {
