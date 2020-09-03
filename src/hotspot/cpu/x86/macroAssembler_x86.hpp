@@ -170,10 +170,11 @@ class MacroAssembler: public Assembler {
   void movflt(XMMRegister dst, AddressLiteral src);
   void movflt(Address dst, XMMRegister src) { movss(dst, src); }
 
-  void movdbl(XMMRegister dst, XMMRegister src) {
+  void movdbl(XMMRegister dst, XMMRegister src, bool force_single_move=false) {
     if (dst-> encoding() == src->encoding()) return;
-    if (UseXmmRegToRegMoveAll) { movapd(dst, src); return; }
-    else                       { movsd (dst, src); return; }
+    if (UseXmmRegToRegMoveAll &&
+        !force_single_move) { movapd(dst, src); return; }
+    else                    { movsd (dst, src); return; }
   }
 
   void movdbl(XMMRegister dst, AddressLiteral src);

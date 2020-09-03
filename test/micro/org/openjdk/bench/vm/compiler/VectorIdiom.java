@@ -32,18 +32,65 @@ import java.util.Random;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(Scope.Thread)
 public abstract class VectorIdiom {
-  @Param({"2", "4", "8", "16", "32", "64", "128"})
-    public int COUNT;
+    @Param({"2", "4", "8", "16", "32", "64", "128"})
+    public int COUNT = 100;
 
     private static byte[] bytesA;
-
+    private static float[] floatsA;
+    private static float[][] A;
+    private static float[] b;
     private static Random r = new Random();
+
+    float[][] randomDDMatrix(int n) {
+        float MIN_ELEM = 1;
+        float MAX_ELEM = 100;
+
+        float[][] m = new float[n][n];
+        for (int i = 0; i < n; i++) {
+            float rowSum = 0;
+            for (int j = 0; j < n; j++) {
+                if (i != j) {
+                    float elem = MIN_ELEM + r.nextFloat()*(MAX_ELEM - MIN_ELEM);
+                    m[i][j] = elem;
+                    rowSum += elem;
+                }
+            }
+            m[i][i] = rowSum + 1;
+        }
+
+        return m;
+    }
+
+    float[] randomVector(int n) {
+        float MIN_ELEM = 1;
+        float MAX_ELEM = 100;
+
+        float[] v = new float[n];
+        for (int i = 0; i < n; i++) {
+            v[i] = MIN_ELEM + r.nextFloat()*(MAX_ELEM - MIN_ELEM);
+        }
+
+        return v;
+    }
 
     @Setup
     public void init() {
         bytesA = new byte[COUNT];
         r.nextBytes(bytesA);
+
+        floatsA = new float[COUNT];
+        for (int i = 0; i < COUNT; i++) {
+            floatsA[i] = r.nextFloat();
+        }
+
+        A = randomDDMatrix(COUNT);
+        b = randomVector(COUNT);
     }
+
+    // @Benchmark
+    // public float[] jacobiWrap() {
+    //     return jacobi(A, b, 1);
+    // }
 
     @Benchmark
     public int stringHashCodeWrap() {
@@ -58,20 +105,65 @@ public abstract class VectorIdiom {
         return h;
     }
 
+    // @Benchmark
+    // public float floatMulReductionWrap() {
+    //     return floatReduction(floatsA);
+    // }
+
+    public float floatMulReduction(float[] a) {
+        float h = 0;
+        for (float v : a) {
+            h = 2*h + v;
+        }
+        return h;
+    }
+
+    // @Benchmark
+    // public float floatIdentityReductionWrap() {
+    //     return floatIdentityReduction(floatsA);
+    // }
+
+    public float floatIdentityReduction(float[] a) {
+        float h = 0;
+        for (float v : a) {
+            h += v;
+        }
+        return h;
+    }
+
+    // @Benchmark
+    // public float floatMatrixSplitLoopWrap() {
+    //     return floatMatrixSplitLoop(A);
+    // }
+
+    // public float floatMatrixSplitLoop(float[][] a) {
+    //     float h = 0;
+    //     for (int i = 0; i < a.length; i++) {
+    //         float[] row = a[i];
+    //         for (int j = 0; j < i; j++) {
+    //             h = h + (row[j] + 2*row[j]);
+    //         }
+    //         for (int j = i+1; j < row.length; j++) {
+    //             h = h + (row[j] + 2*row[j]);
+    //         }
+    //     }
+    //     return h;
+    // }
+
     @Fork(value = 1, jvmArgsPrepend = {
             "-XX:+SuperWordPolynomial",
             "-XX:SuperWordPolynomialWidth=16"
         })
-    public static class WithXMMSuperword extends VectorIdiom { }
+    public static class VectorXMM extends VectorIdiom { }
 
     @Fork(value = 1, jvmArgsPrepend = {
       "-XX:+SuperWordPolynomial",
       "-XX:SuperWordPolynomialWidth=32"
     })
-    public static class WithYMMSuperword extends VectorIdiom { }
+    public static class VectorYMM extends VectorIdiom { }
 
     @Fork(value = 1, jvmArgsPrepend = {
             "-XX:-SuperWordPolynomial"})
-    public static class XNoSuperword extends VectorIdiom { }
+    public static class VectorNone extends VectorIdiom { }
 
 }

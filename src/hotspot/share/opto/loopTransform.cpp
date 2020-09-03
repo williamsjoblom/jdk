@@ -760,8 +760,11 @@ bool IdealLoopTree::policy_unroll(PhaseIdealLoop *phase) {
   // idioms.
   if (SuperWordPolynomial && !cl->was_idiom_analyzed()) return false;
   // Disable unrolling for loops that has been idiom vectorized.
-  if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
-  if (SuperWordPolynomial) return false;
+
+  // TODO: Maybe uncomment these suckers:
+  // if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
+  // if (SuperWordPolynomial) return false;
+
   // {
   //   tty->print_cr("WARNING: unroll disabled!");
   //   return false;
@@ -1845,6 +1848,11 @@ void PhaseIdealLoop::do_unroll(IdealLoopTree *loop, Node_List &old_new, bool adj
   CountedLoopNode *loop_head = loop->_head->as_CountedLoop();
   CountedLoopEndNode *loop_end = loop_head->loopexit();
 #ifndef PRODUCT
+  if (loop_head->has_passed_idiom_analysis()) {
+    tty->print_cr("Unrolling idiom vectorized loop");
+  }
+
+
   if (PrintOpto && VerifyLoopOptimizations) {
     tty->print("Unrolling ");
     loop->dump_head();

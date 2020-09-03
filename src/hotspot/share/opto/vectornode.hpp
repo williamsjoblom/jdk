@@ -878,10 +878,10 @@ class ReplicateDNode : public VectorNode {
   virtual int Opcode() const;
 };
 
-// Promote a single int scalar to the vector [0, 0, ..., scalar]
+// Promote scalar.
 class PromoteNode : public VectorNode {
 public:
-  PromoteNode(Node *in1, const TypeVect *vt) : VectorNode(in1, vt) {}
+  PromoteNode(Node *vec, Node *scalar, const TypeVect *vt) : VectorNode(vec, scalar, vt) {}
   virtual int Opcode() const;
 };
 
