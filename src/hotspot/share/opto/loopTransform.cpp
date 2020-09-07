@@ -759,6 +759,7 @@ bool IdealLoopTree::policy_unroll(PhaseIdealLoop *phase) {
   // Delay unrolling until the loop has been analyzed for vectorizable
   // idioms.
   if (SuperWordPolynomial && !cl->was_idiom_analyzed()) return false;
+  if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
   // Disable unrolling for loops that has been idiom vectorized.
 
   // TODO: Maybe uncomment these suckers:

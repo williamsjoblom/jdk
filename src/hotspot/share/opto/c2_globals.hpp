@@ -783,5 +783,8 @@
           "Use polynomial reduction support in superword")                  \
                                                                             \
   product(uintx, SuperWordPolynomialWidth, 32,                              \
-          "Target vector with for SuperWordPolynomial")
+          "Target vector with for SuperWordPolynomial")                     \
+                                                                            \
+  product(bool, SuperWordPolynomialAlign, false,                            \
+          "Align polynomial reductions when possible")
 #endif // SHARE_OPTO_C2_GLOBALS_HPP

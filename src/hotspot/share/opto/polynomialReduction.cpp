@@ -13,12 +13,15 @@
 #include "utilities/powerOfTwo.hpp"
 #include "opto/opaquenode.hpp"
 #include "utilities/align.hpp"
+#include "opto/castnode.hpp"
+#include "opto/convertnode.hpp"
 
 /****************************************************************
  * Forward declarations.
  ***************************************************************/
 Node *make_vector(PhaseIdealLoop *phase, Node *init, const Type *recurr_t, juint vec_size);
 Node *make_vector(PhaseIdealLoop *phase, jlong init, const Type *recurr_t, juint vec_size);
+void adjust_limit(CountedLoopNode *cl, PhaseIterGVN &igvn, Node *adjusted_limit);
 template<typename T>
 T my_pow(T n, jint exp);
 
@@ -38,7 +41,7 @@ enum TraceOpts {
 };
 
 // Enabled trace options.
-const int TRACE_OPTS = FinalReport;
+const int TRACE_OPTS = Success;
 
 // Maximum search depth for `find_node`.
 //
@@ -442,7 +445,10 @@ struct PatternInstance : ResourceObj {
   virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) = 0;
   virtual Node *result() = 0;
 
+  virtual bool has_alignable_load() = 0;
   virtual int memory_stride() { return 0; }
+  virtual BasicType elem_bt() { ShouldNotCallThis(); return T_ILLEGAL; }
+  virtual Node *base_addr() = 0;
 };
 
 // Array read pattern instance.
@@ -507,13 +513,12 @@ struct ArrayLoadPattern : PatternInstance {
     return NULL;
   }
 
-  virtual Node *result() {
-    return _load;
-  }
+  virtual Node *result() { return _load; }
 
-  virtual int memory_stride() {
-    return _elem_byte_size;
-  }
+  virtual bool has_alignable_load() { return true; }
+  virtual int memory_stride() { return _elem_byte_size; }
+  virtual BasicType elem_bt() { return _load->as_Load()->memory_type(); }
+  virtual Node *base_addr() { return _array_ptr; }
 };
 
 struct ScalarPattern : PatternInstance {
@@ -526,6 +531,9 @@ struct ScalarPattern : PatternInstance {
   virtual Node *result() {
     return _scalar;
   }
+
+  virtual bool has_alignable_load() { return false; }
+  virtual Node *base_addr() { ShouldNotCallThis(); return NULL; }
 };
 
 struct BinOpPattern : PatternInstance {
@@ -546,6 +554,22 @@ struct BinOpPattern : PatternInstance {
   virtual Node *result() {
     ShouldNotCallThis();
     return NULL;
+  }
+
+  virtual bool has_alignable_load() {
+    return
+      _lhs->has_alignable_load() ||
+      _rhs->has_alignable_load();
+  }
+
+  virtual BasicType elem_bt() {
+    if (_lhs->has_alignable_load()) return _lhs->elem_bt();
+    else return _rhs->elem_bt();
+  }
+
+  virtual Node *base_addr() {
+    if (_lhs->has_alignable_load()) return _lhs->base_addr();
+    else return _rhs->base_addr();
   }
 };
 
@@ -903,17 +927,42 @@ PatternInstance *match(Node *start, Node *iv) {
 
 // Number of iterations that are to be taken to satisfy alignment constraints.
 // Constant folded down to a `&`, `-`, and `<<`.
-Node *preloop_align_limit(Node *target_align, Node *ptr_first_elem, int elem_size) {
+Node *pre_loop_align_limit(PhaseIterGVN& igvn, Node *target_align, Node *ptr_first_elem, int elem_size) {
   // ptr_first_elem % target_align (assumes `target_align` to be power of 2).
-  Node *mod = new AndINode(ptr_first_elem,
-                           new AddINode(target_align, ConNode::make(TypeInt::make(-1))));
+  Node *target_minus1 = igvn.transform(new AddINode(target_align, igvn.intcon(-1)));
+  Node *mod = igvn.transform(new AndINode(ptr_first_elem, target_minus1));
+
   // target_align - ptr_first_elem%target_align
-  Node *sub = new SubINode(target_align,
-                           mod);
+  Node *sub = igvn.transform(new SubINode(target_align, mod));
   // (target_align - ptr_first_elem%target_align) / elem_size
-  Node *div = new URShiftINode(sub,
-                              ConNode::make(TypeInt::make(log2_int(elem_size))));
+  Node *div = igvn.transform(new URShiftINode(sub, igvn.intcon(log2_int(elem_size))));
   return div;
+}
+
+void align_first_main_loop_iters(PhaseIterGVN &igvn, CountedLoopNode *pre_loop, Node *orig_limit,
+                                 PatternInstance *pi, int vlen) {
+  if (!pi->has_alignable_load()) return;
+
+  Node *base = pi->base_addr();
+  Node *base_offset = igvn.longcon(arrayOopDesc::base_offset_in_bytes(pi->elem_bt()));
+  Node *first_elem_ptr = igvn.transform(new AddPNode(base, base, base_offset));
+  Node *x_elem_ptr = igvn.transform(new CastP2XNode(NULL, first_elem_ptr));
+#ifdef _LP64
+  // Cast to long pointer to integer in case of 64 bit architecture.
+  // Since alignment is determined by the last few bits, we only
+  // need the least significant part of the pointer anyways.
+  x_elem_ptr = new ConvL2INode(x_elem_ptr);
+  igvn.register_new_node_with_optimizer(x_elem_ptr);
+#endif
+  uint target_align = type2aelembytes(pi->elem_bt())*vlen;
+  Node *target_align_con = igvn.intcon(target_align);
+
+  Node *new_limit = pre_loop_align_limit(igvn, target_align_con, x_elem_ptr,
+                                         type2aelembytes(pi->elem_bt()));
+  Node *constrained_limit = new MinINode(orig_limit, new_limit);
+  igvn.register_new_node_with_optimizer(constrained_limit);
+
+  adjust_limit(pre_loop, igvn, constrained_limit);
 }
 
 /****************************************************************
@@ -1193,7 +1242,7 @@ CmpNode *zero_trip_test(CountedLoopNode *loop) {
 // Split loop into a pre, main, and post loop and adjust zero trip
 // guard for the main loop to account for the vector length.
 Node *split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
-                CountedLoopNode *cl, juint vlen) {
+                 CountedLoopNode *cl, juint vlen) {
   Node_List old_new;
   if (cl->is_normal_loop()) {
     phase->insert_pre_post_loops(lpt, old_new, false);
@@ -1229,13 +1278,13 @@ void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
 }
 
 // Adjust loop limit to account for the vector length.
-void adjust_limit(CountedLoopNode *cl, PhaseIdealLoop *phase, Node *adjusted_limit) {
+void adjust_limit(CountedLoopNode *cl, PhaseIterGVN &igvn, Node *adjusted_limit) {
   // WARNING: (limit - stride) may underflow.
   // TODO: See `loopTransform.cpp:do_unroll()` for how to patch this up correctly.
   const uint LIMIT = 2;
   Node *cmp = cl->loopexit()->cmp_node();
   assert(cmp != NULL && cmp->req() == 3, "no loop limit found");
-  phase->igvn().replace_input_of(cmp, LIMIT, adjusted_limit);
+  igvn.replace_input_of(cmp, LIMIT, adjusted_limit);
 }
 
 // TODO: move to Matcher::
@@ -1337,12 +1386,23 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase, PhaseIte
    * Vectorize IR.
    **************************************************************/
   // Split loop.
+  Node *orig_limit = cl->limit();
   Node *new_limit = split_loop(lpt, phase, cl, VLEN);
   set_stride(cl, phase, VLEN);
-  adjust_limit(cl, phase, new_limit);
+  adjust_limit(cl, phase->igvn(), new_limit);
 
   if (C->max_vector_size() < VBYTES) {
     C->set_max_vector_size(VBYTES);
+  }
+
+  assert(pi->has_alignable_load(), "expected for debug");
+
+
+  // Align first iteration.
+  CountedLoopNode *pre_loop = find_pre_loop(cl);
+  if (SuperWordPolynomialAlign) {
+    align_first_main_loop_iters(phase->igvn(), pre_loop,
+                                orig_limit, pi, VLEN);
   }
 
   // Generate vectorized C term.
