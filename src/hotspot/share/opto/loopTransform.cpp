@@ -759,7 +759,7 @@ bool IdealLoopTree::policy_unroll(PhaseIdealLoop *phase) {
   // Delay unrolling until the loop has been analyzed for vectorizable
   // idioms.
   if (SuperWordPolynomial && !cl->was_idiom_analyzed()) return false;
-  if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
+  // if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
   // Disable unrolling for loops that has been idiom vectorized.
 
   // TODO: Maybe uncomment these suckers:
@@ -1849,9 +1849,9 @@ void PhaseIdealLoop::do_unroll(IdealLoopTree *loop, Node_List &old_new, bool adj
   CountedLoopNode *loop_head = loop->_head->as_CountedLoop();
   CountedLoopEndNode *loop_end = loop_head->loopexit();
 #ifndef PRODUCT
-  if (loop_head->has_passed_idiom_analysis()) {
-    tty->print_cr("Unrolling idiom vectorized loop");
-  }
+  // if (loop_head->has_passed_idiom_analysis()) {
+  //   tty->print_cr("Unrolling idiom vectorized loop");
+  // }
 
 
   if (PrintOpto && VerifyLoopOptimizations) {

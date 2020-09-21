@@ -32,11 +32,20 @@ import java.util.Random;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(Scope.Thread)
 public abstract class VectorIdiom {
-    @Param({"2", "4", "8", "16", "32", "64", "128"})
-    public int COUNT = 100;
+    @Param({//"2", // "4"
+        // "8",
+        "16",
+        // "32",
+        // "64"
+        // "128"
+        })
+    public int COUNT;
 
+    private static int[] intsA;
     private static byte[] bytesA;
     private static float[] floatsA;
+    private static double[] doublesA;
+    private static double[] doublesB;
     private static float[][] A;
     private static float[] b;
     private static Random r = new Random();
@@ -75,12 +84,17 @@ public abstract class VectorIdiom {
 
     @Setup
     public void init() {
+        intsA = new int[COUNT];
         bytesA = new byte[COUNT];
         r.nextBytes(bytesA);
 
         floatsA = new float[COUNT];
+        doublesA = new double[COUNT];
+        doublesB = new double[COUNT];
         for (int i = 0; i < COUNT; i++) {
             floatsA[i] = r.nextFloat();
+            doublesA[i] = r.nextDouble();
+            doublesB[i] = r.nextDouble();
         }
 
         A = randomDDMatrix(COUNT);
@@ -92,17 +106,30 @@ public abstract class VectorIdiom {
     //     return jacobi(A, b, 1);
     // }
 
-    @Benchmark
-    public int stringHashCodeWrap() {
-        return stringHashCodea(bytesA);
-    }
+    // @Benchmark
+    // public int stringHashCodeWrap() {
+    //     return stringHashCodea(bytesA);
+    // }
 
     public int stringHashCodea(byte[] a) {
         int h = 0;
         for (int i = 0; i < a.length; i++) {
-            h = h*31 + (a[i] & 0xff);
+          h = 31*h + (a[i] & 0xFF);
         }
         return h;
+    }
+
+    @Benchmark
+    public int dotWrap() {
+        dot(doublesA, doublesB);
+    }
+
+    public double dot(double[] a, double[] b) {
+        double dotProduct = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            dotProduct += a[i]*b[i];
+        }
+        return dotProduct;
     }
 
     // @Benchmark
@@ -150,20 +177,38 @@ public abstract class VectorIdiom {
     //     return h;
     // }
 
-    @Fork(value = 1, jvmArgsPrepend = {
+    // @Fork(value = 1, jvmArgsPrepend = {
+    //         "-XX:+SuperWordPolynomial",
+    //         "-XX:SuperWordPolynomialWidth=16",
+    //         "-XX:+SuperWordPolynomialAlign"
+    //     })
+    // public static class VectorXMMAligned extends VectorIdiom { }
+
+    // @Fork(value = 1, jvmArgsPrepend = {
+    //   "-XX:+SuperWordPolynomial",
+    //   "-XX:SuperWordPolynomialWidth=32",
+    //   "-XX:+SuperWordPolynomialAlign"
+    // })
+    // public static class VectorYMMAligned extends VectorIdiom { }
+
+   @Fork(value = 1, jvmArgsPrepend = {
             "-XX:+SuperWordPolynomial",
-            "-XX:SuperWordPolynomialWidth=16"
+            "-XX:SuperWordPolynomialWidth=16",
+            // "-XX:+UnlockDiagnosticVMOptions",
+            // "-XX:+PrintOptoAssembly"
         })
     public static class VectorXMM extends VectorIdiom { }
 
-    @Fork(value = 1, jvmArgsPrepend = {
-      "-XX:+SuperWordPolynomial",
-      "-XX:SuperWordPolynomialWidth=32"
-    })
-    public static class VectorYMM extends VectorIdiom { }
+    // @Fork(value = 1, jvmArgsPrepend = {
+    //   "-XX:+SuperWordPolynomial",
+    //   "-XX:SuperWordPolynomialWidth=32"
+    // })
+    // public static class VectorYMM extends VectorIdiom { }
 
     @Fork(value = 1, jvmArgsPrepend = {
-            "-XX:-SuperWordPolynomial"})
-    public static class VectorNone extends VectorIdiom { }
-
+        "-XX:-SuperWordPolynomial",
+        // "-XX:+UnlockDiagnosticVMOptions",
+        // "-XX:+PrintOptoAssembly"
+      })
+    public static class VectorXNone extends VectorIdiom { }
 }

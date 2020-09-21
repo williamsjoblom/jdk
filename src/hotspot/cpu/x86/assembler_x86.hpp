@@ -1743,7 +1743,6 @@ private:
   void vpmovsxwd(XMMRegister dst, Address src, int vector_len);
   void vpmovsxdq(XMMRegister dst, Address src, int vector_len);
 
-
   void evpmovwb(Address dst, XMMRegister src, int vector_len);
   void evpmovwb(Address dst, KRegister mask, XMMRegister src, int vector_len);
 

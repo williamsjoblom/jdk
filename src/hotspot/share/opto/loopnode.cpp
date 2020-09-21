@@ -2704,6 +2704,7 @@ void IdealLoopTree::dump_head() const {
     if (cl->is_vectorized_loop()) tty->print(" vector");
     if (cl->range_checks_present()) tty->print(" rc ");
     if (cl->is_multiversioned()) tty->print(" multi ");
+    if (cl->has_passed_idiom_analysis()) tty->print(" idiomvec ");
   }
   if (_has_call) tty->print(" has_call");
   if (_has_sfpt) tty->print(" has_sfpt");
@@ -2922,6 +2923,9 @@ bool PhaseIdealLoop::process_expensive_nodes() {
 // Create a PhaseLoop.  Build the ideal Loop tree.  Map each Ideal Node to
 // its corresponding LoopNode.  If 'optimize' is true, do some loop cleanups.
 void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
+  // if (strcmp(C->method()->name()->as_utf8(), "stringHashCodeWrap") == 0) {
+  //   //TraceLoopOpts = true;
+  // }
   bool do_split_ifs = (mode == LoopOptsDefault);
   bool skip_loop_opts = (mode == LoopOptsNone);
 

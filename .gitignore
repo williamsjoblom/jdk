@@ -23,3 +23,5 @@ NashornProfile.txt
 /src/utils/IdealGraphVisualizer/build/
 /src/utils/IdealGraphVisualizer/*/build
 /src/utils/IdealGraphVisualizer/nbplatform
+compile_commands.json
+compile-commands.json

@@ -3445,12 +3445,47 @@ instruct ConV32_imm(vec dst, immL a, immL b, immL c, immL d) %{
 
 instruct ConV16_imm(vec dst, immL lo, immL hi) %{
   match(Set dst (ConV16 lo hi));
-  format %{ "ConV16 $dst" %}
+  format %{ "movdqa $dst ! load aligned vector constant" %}
   ins_encode %{
     uint vlen = vector_length(this);
     InternalAddress lo_addr = $constantaddress($hi$$constant, $lo$$constant);
     // Aligned load. Asserts that lo_addr is aligned.
     __ movdqa($dst$$XMMRegister, lo_addr);
+  %}
+  ins_pipe( pipe_slow );
+%}
+
+instruct ElemLShiftV_imm(vec dst, vec src, immU8 dist) %{
+  match(Set dst (ElemLShiftV src dist));
+  format %{ "pslldq $dst, $src, $dist" %}
+  ins_encode %{
+    int vlen_enc = vector_length_encoding(this);
+    switch (vector_length_in_bytes(this, $src)) {
+    case 16:
+      __ movdqa($dst$$XMMRegister, $src$$XMMRegister);
+      __ pslldq($dst$$XMMRegister, $dist$$constant);
+      break;
+    case 32:
+      // Added complexity since we shift across the 128-bit interlane
+      // boundary.
+      if ($dist$$constant < 16) {
+        __ vperm2i128($dst$$XMMRegister, $src$$XMMRegister, $src$$XMMRegister,
+                      0x8);
+        __ vpalignr($dst$$XMMRegister, $src$$XMMRegister, $dst$$XMMRegister,
+                    16 - $dist$$constant, vlen_enc);
+      } else if ($dist$$constant == 16) {
+        __ vperm2i128($dst$$XMMRegister, $src$$XMMRegister, $src$$XMMRegister,
+                      0x8);
+      } else if ($dist$$constant > 16) {
+        assert(false, "not implemented");
+      }
+
+      // __ vpsllvd($dst$$XMMRegister, $src$$XMMRegister, $dist$$constant,
+      //          Assembler::AVX_256bit);
+      break;
+    default:
+      ShouldNotReachHere();
+    }
   %}
   ins_pipe( pipe_slow );
 %}
@@ -3701,6 +3736,37 @@ instruct ReplI_M1(vec dst, immI_M1 con) %{
   ins_pipe( pipe_slow );
 %}
 
+
+instruct ReplI_element(vec dst, vec src, immI pos) %{
+  predicate(UseAVX > 0);
+  match(Set dst (ReplicateI (ExtractI src pos)));
+  format %{ "replicateI $dst, $src, $pos ! replicate element at pos" %}
+  ins_encode %{
+    int vlen_enc = vector_length_encoding(this);
+    int p = $pos$$constant;
+    int control = 0xFF;//p | p << 2 | p << 4 | p << 6;
+    switch (vector_length_in_bytes(this, $src)) {
+    case 16:
+      __ pshufd($dst$$XMMRegister, $src$$XMMRegister, control);
+      break;
+    case 32:
+      // Pick the last element from each 128-bit lane, and replicate
+      // it over it's corresponding lane.
+      __ vpshufd($dst$$XMMRegister, $src$$XMMRegister, control, vlen_enc);
+
+      // Replicate the upper 128-bit lane to fill the entire register.
+      // WARNING: High instruction latency. A better solution may
+      // exist.
+      __ vperm2i128($dst$$XMMRegister, $dst$$XMMRegister, $dst$$XMMRegister,
+                    0x33);
+      break;
+    default:
+      ShouldNotReachHere();
+    }
+  %}
+  ins_pipe( pipe_slow );
+%}
+
 // ====================ReplicateL=======================================
 
 #ifdef _LP64
@@ -3854,7 +3920,7 @@ instruct ReplF_reg(vec dst, vlRegF src) %{
     uint vlen = vector_length(this);
     if (vlen <= 4) {
       __ pshufd($dst$$XMMRegister, $src$$XMMRegister, 0x00);
-   } else if (VM_Version::supports_avx2()) {
+    } else if (VM_Version::supports_avx2()) {
       int vector_len = vector_length_encoding(this);
       __ vbroadcastss($dst$$XMMRegister, $src$$XMMRegister, vector_len); // reg-to-reg variant requires AVX2
     } else {

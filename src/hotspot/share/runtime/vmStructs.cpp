@@ -1779,6 +1779,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_c2_type(AddReductionVDNode, ReductionNode)                      \
   declare_c2_type(ConV16Node, VectorNode)                                 \
   declare_c2_type(ConV32Node, VectorNode)                                 \
+  declare_c2_type(ElemLShiftVNode, VectorNode)                            \
   declare_c2_type(SubVBNode, VectorNode)                                  \
   declare_c2_type(SubVSNode, VectorNode)                                  \
   declare_c2_type(SubVINode, VectorNode)                                  \

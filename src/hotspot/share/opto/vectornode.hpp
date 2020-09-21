@@ -828,6 +828,7 @@ public:
   uint element_size(void) { return type2aelembytes(vect_type()->element_basic_type()); }
 };
 
+
 //=========================Promote_Scalar_to_Vector============================
 
 //------------------------------ReplicateBNode---------------------------------
@@ -881,7 +882,7 @@ class ReplicateDNode : public VectorNode {
 // Promote scalar.
 class PromoteNode : public VectorNode {
 public:
-  PromoteNode(Node *vec, Node *scalar, const TypeVect *vt) : VectorNode(vec, scalar, vt) {}
+  PromoteNode(Node *vsrc, Node *src, const TypeVect *vt) : VectorNode(vsrc, src, vt) {}
   virtual int Opcode() const;
 };
 
@@ -903,6 +904,16 @@ public:
   ConV32Node(Node *n1, Node *n2, const TypeVect *vt)
       : VectorNode(n1, n2, vt) {
     init_req(0, (Node*)Compile::current()->root());
+  }
+  virtual int Opcode() const;
+};
+
+// Left shift
+class ElemLShiftVNode : public VectorNode {
+public:
+  ElemLShiftVNode(Node *vector, Node *dist, const TypeVect *vt)
+    : VectorNode(vector, dist, vt) {
+    assert(dist->is_Con(), "expected constant shift distance");
   }
   virtual int Opcode() const;
 };
