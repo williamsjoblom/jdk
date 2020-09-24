@@ -15,123 +15,42 @@
 #include "utilities/align.hpp"
 #include "opto/castnode.hpp"
 #include "opto/convertnode.hpp"
+#include "opto/idiomPattern.hpp"
+#include "opto/idiomMatch.hpp"
 
 /****************************************************************
  * Forward declarations.
  ***************************************************************/
-Node *make_vector(PhaseIdealLoop *phase, Node *init, const Type *recurr_t,
-                  juint vec_size, Node *control=NULL);
-Node *make_vector(PhaseIdealLoop *phase, jlong init, const Type *recurr_t,
-                  juint vec_size, Node *control=NULL);
-void adjust_limit(CountedLoopNode *cl, PhaseIterGVN &igvn, Node *adjusted_limit);
+struct PatternInstance;
+
 template<typename T>
 T my_pow(T n, jint exp);
+
+const int TRACE_OPTS = Match | MinCond;
+
+/****************************************************************
+ * Map dense Node indices to PatternInstances.
+ ****************************************************************/
+class Node2Instance : public ResourceObj {
+  GrowableArray<PatternInstance *> map;
+
+  void annotate(const Node *node, PatternInstance *with_pattern) {
+    map.at_put_grow(node->_idx, with_pattern);
+  }
+
+  PatternInstance *at(const Node *node) {
+    assert(map.length() > 0, "");
+    if ((uint32_t) map.length() <= node->_idx) return NULL;
+    assert(node->_idx <= INT32_MAX, "");
+    return map.at(node->_idx);
+  }
+};
 
 /****************************************************************
  * Tracing.
  ****************************************************************/
-enum TraceOpts {
-  NoTraceOpts = 0,
-  MinCond = 1 << 0,
-  Match = 1 << 1,
-  Rewrite = 1 << 2,
-  Success = 1 << 3,
-  Failure = 1 << 4,
-  FinalReport = Success | Failure,
-  Candidates = 1 << 5,
-  AllTraceOpts = 0xFFFFFFFF
-};
 
-// Enabled trace options.
-const int TRACE_OPTS = NoTraceOpts;
 
-// Maximum search depth for `find_node`.
-//
-// TODO: The current value of `20` is most likely too high and is
-// likely to produce a significant compile-time performance hit.
-// NOTE: Currently unused, no fix needed.
-const uint MAX_SEARCH_DEPTH = 20;
-
-#ifndef PRODUCT
-#define TRACE(OPT, BODY)                                                \
-  do {                                                                  \
-    if (((OPT) & TRACE_OPTS) != 0) {                                    \
-      BODY;                                                             \
-    }                                                                   \
-  } while(0)
-#else
-#define TRACE(OPT, BODY)                        \
-  do { } while (0)
-#endif
-
-/****************************************************************
- * Predicates.
- ****************************************************************/
-bool is_array_ptr(Node *n) {
-  return n->is_Type() && n->as_Type()->type()->isa_aryptr() != NULL;
-}
-
-bool is_primitive_load(Node *n) {
-  return n->is_Load() && is_java_primitive(n->bottom_type()->basic_type());
-}
-
-bool is_primitive_store(Node *n) {
-  // FIXME: Verify that the store is primitive.
-  return n->is_Store();
-}
-
-bool is_mul(Node *n) { return n->is_Mul(); }
-bool is_add(Node *n) { return n->is_Add(); }
-bool is_sub(Node *n) { return n->is_Sub(); }
-bool is_lshift(Node *n) { return n->Opcode() == Op_LShiftI || n->Opcode() == Op_LShiftL; }
-
-// Is integer valued binop?
-bool is_binop_i(Node *n) {
-  int opc = n->Opcode();
-  return
-    opc == Op_AddI ||
-    opc == Op_SubI ||
-    opc == Op_MulI ||
-    opc == Op_DivI ||
-    opc == Op_LShiftI;
-}
-
-// Is long valued binop?
-bool is_binop_l(Node *n) {
-  int opc = n->Opcode();
-  return
-    opc == Op_AddL ||
-    opc == Op_SubL ||
-    opc == Op_MulL ||
-    opc == Op_DivL ||
-    opc == Op_LShiftL;
-}
-
-// Is float valued binop?
-bool is_binop_f(Node *n) {
-  int opc = n->Opcode();
-  return
-    opc == Op_AddF ||
-    opc == Op_SubF ||
-    opc == Op_MulF ||
-    opc == Op_DivF;
-}
-
-// Is double valued binop?
-bool is_binop_d(Node *n) {
-  int opc = n->Opcode();
-  return
-    opc == Op_AddD ||
-    opc == Op_SubD ||
-    opc == Op_MulD ||
-    opc == Op_DivD;
-}
-
-bool is_binop(Node *n) {
-  return
-    is_binop_i(n) || is_binop_l(n) ||
-    is_binop_f(n) || is_binop_d(n);
-}
 
 /****************************************************************
  * Minimum matching condition.
@@ -159,8 +78,9 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory=false) {
     bool primitive_reduction = !memory &&
       is_java_primitive(n->bottom_type()->basic_type());
 
-    if (n->is_Phi() && n != induction_phi &&
-        (primitive_reduction || memory_reduction)) {
+    if (n->is_Phi() && n != induction_phi //&&
+        // (primitive_reduction || memory_reduction)
+        ) {
       // Only allow loops with one cross-iteration dependecy for now:
       if (recurrence_phi != NULL) {
         TRACE(MinCond, {
@@ -184,20 +104,20 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory=false) {
 
 // Do a depth first search following outgoing edges until a member of
 // `nodes` is found. This node is then returned.
-Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List &visited, uint depth=0) {
-  if (depth >= MAX_SEARCH_DEPTH || visited.member(start)) return NULL;
-  if (nodes.contains(start)) return start;
+// Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List &visited, uint depth=0) {
+//   if (depth >= MAX_SEARCH_DEPTH || visited.member(start)) return NULL;
+//   if (nodes.contains(start)) return start;
 
-  visited.push(start);
+//   visited.push(start);
 
-  for (DUIterator it = start->outs(); start->has_out(it); it++) {
-    Node *n = start->out(it);
-    Node *result = find_nodes(n, nodes, visited, depth + 1);
-    if (result != NULL) return result;
-  }
+//   for (DUIterator it = start->outs(); start->has_out(it); it++) {
+//     Node *n = start->out(it);
+//     Node *result = find_nodes(n, nodes, visited, depth + 1);
+//     if (result != NULL) return result;
+//   }
 
-  return NULL;
-}
+//   return NULL;
+// }
 
 // TODO: most likely too slow to be run on EVERY CountedLoop. We
 // should probably replace the DFS in `find_nodes` with a BFS, reduce
@@ -219,392 +139,10 @@ Node *find_rhs(PhiNode *reduction_phi) {
 /****************************************************************
  * Match references.
  ****************************************************************/
-class MatchRefs : public ResourceObj {
-  static const int MAX_REFS = 32;
-  int _n;
-  Node *_refs[MAX_REFS];
-
-public:
-  MatchRefs(int n) : _n(n) {
-    assert(n <= MAX_REFS, "maximum number of references reached");
-    for (int i = 0; i < n; ++i) _refs[i] = NULL;
-  }
-
-  inline Node *&operator[](int i) {
-    guarantee(i < _n, "out of bounds");
-    return _refs[i];
-  }
-};
 
 /****************************************************************
  * Pattern matching.
  ****************************************************************/
-
-#define ANY (Pattern*)NULL
-const bool TRACE_MATCHING = true;
-
-class Pattern : public ResourceObj {
-protected:
-  static const int NO_REF = -1;
-  inline void set_ref(Node *n, MatchRefs &refs) {
-    if (_ref != NO_REF) refs[_ref] = n;
-  }
-public:
-  int _ref;
-
-  Pattern(int ref) : _ref(ref) {}
-  virtual ~Pattern() {}
-  virtual bool match(Node *n, MatchRefs& refs) = 0;
-};
-
-// TODO: Make Opcode a field instead of a template parameter.
-template<uint NSubpatterns>
-class OpcodePattern : public Pattern {
-public:
-  int _opcode;
-  Pattern* _subpatterns[NSubpatterns];
-
-  OpcodePattern(int opcode, int ref=NO_REF)
-    : Pattern(ref), _opcode(opcode) {
-    assert(NSubpatterns == 0, "expected");
-  }
-
-  OpcodePattern(int opcode, Pattern *p0, int ref=NO_REF)
-    : Pattern(ref), _opcode(opcode) {
-    assert(NSubpatterns == 1, "expected");
-    _subpatterns[0] = p0;
-  }
-
-  OpcodePattern(int opcode, Pattern *p0, Pattern *p1, int ref=NO_REF)
-    : Pattern(ref), _opcode(opcode) {
-    assert(NSubpatterns == 2, "expected");
-    _subpatterns[0] = p0;
-    _subpatterns[1] = p1;
-  }
-
-  OpcodePattern(int opcode, Pattern *p0, Pattern *p1, Pattern *p2, int ref=NO_REF)
-    : Pattern(ref), _opcode(opcode) {
-    assert(NSubpatterns == 3, "expected");
-    _subpatterns[0] = p0; _subpatterns[1] = p1;
-    _subpatterns[2] = p2;
-  }
-
-  OpcodePattern(int opcode, Pattern *p0, Pattern *p1, Pattern *p2, Pattern *p3, int ref=NO_REF)
-    : Pattern(ref), _opcode(opcode) {
-    assert(NSubpatterns == 4, "expected");
-    _subpatterns[0] = p0; _subpatterns[1] = p1;
-    _subpatterns[2] = p2; _subpatterns[3] = p3;
-  }
-
-  bool match(Node *n, MatchRefs &refs) {
-    if (n->Opcode() != _opcode) {
-      set_ref(NULL, refs);
-      return false;
-    }
-
-    for (uint i = 0; i < (NSubpatterns < n->req() ? NSubpatterns : n->req()); i++) {
-      Node *next = n->in(i);
-      Pattern *sp = _subpatterns[i];
-      if (sp != ANY) {
-        if (next == NULL || !sp->match(next, refs)) {
-          TRACE(Match, {
-              tty->print("[OpcodePattern] Matching failed for in(%d)", i);
-              n->dump();
-              next != NULL ? next->dump("  found\n") : tty->print_cr("  NULL found");
-            });
-          set_ref(NULL, refs);
-          return false;
-        }
-      }
-    }
-
-    set_ref(n, refs);
-    return true;
-  }
-};
-
-
-class OrPattern : public Pattern {
-public:
-  // Only match this exact node.
-  Pattern *_p0;
-  Pattern *_p1;
-
-  OrPattern(Pattern* p0, Pattern *p1)
-    : Pattern(NO_REF), _p0(p0), _p1(p1) {};
-
-  bool match(Node *n, MatchRefs &refs) {
-    return _p0->match(n, refs) || _p1->match(n, refs);
-  }
-};
-
-class ExactNodePattern : public Pattern {
-public:
-  // Only match this exact node.
-  Node *_n;
-
-  ExactNodePattern(Node *n) : Pattern(NO_REF), _n(n) {};
-
-  bool match(Node *n, MatchRefs &refs) {
-    return n == _n;
-  }
-};
-
-typedef bool (*NodePred)(Node *);
-class PredPattern : public Pattern {
-private:
-  NodePred _pred;
-public:
-  PredPattern(NodePred pred, int ref=NO_REF) : Pattern(ref), _pred(pred) {}
-
-  bool match(Node *n, MatchRefs &refs) {
-    if (_pred(n)) {
-      set_ref(n, refs);
-      return true;
-    } else {
-      set_ref(NULL, refs);
-      return false;
-    }
-  }
-};
-
-template<uint NSubpatterns>
-class Pred2Pattern : public Pattern {
-public:
-  NodePred _pred;
-  Pattern* _subpatterns[NSubpatterns];
-
-  Pred2Pattern(NodePred pred, int ref=NO_REF)
-    : Pattern(ref), _pred(pred) {
-    assert(NSubpatterns == 0, "expected");
-  }
-
-  Pred2Pattern(NodePred pred, Pattern *p0, int ref=NO_REF)
-    : Pattern(ref), _pred(pred) {
-    assert(NSubpatterns == 1, "expected");
-    _subpatterns[0] = p0;
-  }
-
-  Pred2Pattern(NodePred pred, Pattern *p0, Pattern *p1, int ref=NO_REF)
-    : Pattern(ref), _pred(pred) {
-    assert(NSubpatterns == 2, "expected");
-    _subpatterns[0] = p0;
-    _subpatterns[1] = p1;
-  }
-
-  Pred2Pattern(NodePred pred, Pattern *p0, Pattern *p1, Pattern *p2, int ref=NO_REF)
-    : Pattern(ref), _pred(pred) {
-    assert(NSubpatterns == 3, "expected");
-    _subpatterns[0] = p0; _subpatterns[1] = p1;
-    _subpatterns[2] = p2;
-  }
-
-  Pred2Pattern(NodePred pred, Pattern *p0, Pattern *p1, Pattern *p2, Pattern *p3, int ref=NO_REF)
-    : Pattern(ref), _pred(pred) {
-    assert(NSubpatterns == 4, "expected");
-    _subpatterns[0] = p0; _subpatterns[1] = p1;
-    _subpatterns[2] = p2; _subpatterns[3] = p3;
-  }
-
-  bool match(Node *n, MatchRefs &refs) {
-    if (!_pred(n)) {
-      set_ref(NULL, refs);
-      return false;
-    }
-
-    for (uint i = 0; i < n->req() && i < NSubpatterns; i++) {
-      Node *next = n->in(i);
-      Pattern *sp = _subpatterns[i];
-      if (sp != ANY) {
-        if (next == NULL || !sp->match(next, refs)) {
-          TRACE(Match, {
-              tty->print("[Pred2Pattern] Matching failed for in(%d):", i);
-              n->dump();
-              next != NULL ? next->dump("  ") : tty->print("  NULL");
-              tty->print_cr("");
-            });
-          set_ref(NULL, refs);
-          return false;
-        }
-      }
-    }
-
-    set_ref(n, refs);
-    return true;
-  }
-};
-
-
-// Unconditionally matches a node, saving it as a ref.
-class CapturePattern : public Pattern {
-public:
-  CapturePattern(int ref) : Pattern(ref) {}
-  bool match(Node *n, MatchRefs &refs) {
-    set_ref(n, refs);
-    return true;
-  }
-};
-
-/****************************************************************
- * Pattern instances.
- ****************************************************************/
-
-struct PatternInstance : ResourceObj {
-  // Generate Node.
-  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) = 0;
-  virtual Node *result() = 0;
-
-  virtual bool has_alignable_load() = 0;
-  virtual int memory_stride() { return 0; }
-  virtual BasicType elem_bt() { ShouldNotCallThis(); return T_ILLEGAL; }
-  virtual Node *base_addr() = 0;
-};
-
-// Array read pattern instance.
-struct ArrayLoadPattern : PatternInstance {
-  // Basic type of loaded value.
-  BasicType _bt;
-
-  // Load node.
-  Node *_load;
-
-  // Load control dep.
-  Node *_load_ctrl;
-
-  // Node indexing the array.
-  Node *_index;
-
-  // Index offset.
-  Node *_offset;
-
-  // Array being indexed.
-  Node *_array_ptr;
-
-  // Memory state.
-  Node *_memory;
-
-  // Node producing the result.
-  Node *_result;
-
-  // Size, in bytes, of each element.
-  jint _elem_byte_size;
-
-  // Base offset of the array.
-  jlong _base_offset;
-
-  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
-    assert(_offset == NULL, "not implemented");
-    BasicType recurr_bt = recurr_t->array_element_basic_type();
-
-    LoadNode *load = _load->as_Load();
-    BasicType load_type = _bt;
-    BasicType elem_type = load->memory_type();
-
-    TRACE(Rewrite, {
-        tty->print_cr("load: %s, elem: %s, recur: %s", type2name(load_type),
-                      type2name(elem_type), type2name(recurr_bt));
-      });
-
-    // No implicit cast.
-    if (elem_type == recurr_bt) {
-      Node *arr = LoadVectorNode::make(
-        _load->Opcode(), _load->in(LoadNode::Control),
-        _memory, _load->in(LoadNode::Address),
-        _load->adr_type(), vlen, recurr_bt);
-      phase->igvn().register_new_node_with_optimizer(arr, NULL);
-      return arr;
-    } else {
-      Node *arr = LoadVectorNode::make_promotion(
-        _load->Opcode(), _load->in(LoadNode::Control),
-        _memory, _load->in(LoadNode::Address),
-        _load->adr_type(), vlen, recurr_bt);
-      phase->igvn().register_new_node_with_optimizer(arr, NULL);
-      return arr;
-    }
-
-    ShouldNotReachHere();
-    return NULL;
-  }
-
-  virtual Node *result() { return _load; }
-
-  virtual bool has_alignable_load() { return true; }
-  virtual int memory_stride() { return _elem_byte_size; }
-  virtual BasicType elem_bt() { return _load->as_Load()->memory_type(); }
-  virtual Node *base_addr() { return _array_ptr; }
-};
-
-struct ScalarPattern : PatternInstance {
-  Node *_scalar;
-
-  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
-    return make_vector(phase, _scalar, recurr_t, vlen);
-  }
-
-  virtual Node *result() {
-    return _scalar;
-  }
-
-  virtual bool has_alignable_load() { return false; }
-  virtual Node *base_addr() { ShouldNotCallThis(); return NULL; }
-};
-
-struct BinOpPattern : PatternInstance {
-  int _opcode;
-  PatternInstance *_lhs, *_rhs;
-  BasicType _bt;
-
-  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
-    Node *lhs = _lhs->generate(phase, recurr_t, vlen);
-    Node *rhs = _rhs->generate(phase, recurr_t, vlen);
-
-    // TODO: Should we use `_bt` or `recurr_t->array_element_basic_type()` here?
-    Node *result = VectorNode::make(_opcode, lhs, rhs, vlen, _bt);
-    phase->igvn().register_new_node_with_optimizer(result);
-    return result;
-  }
-
-  virtual Node *result() {
-    ShouldNotCallThis();
-    return NULL;
-  }
-
-  virtual bool has_alignable_load() {
-    return
-      _lhs->has_alignable_load() ||
-      _rhs->has_alignable_load();
-  }
-
-  virtual BasicType elem_bt() {
-    if (_lhs->has_alignable_load()) return _lhs->elem_bt();
-    else return _rhs->elem_bt();
-  }
-
-  virtual Node *base_addr() {
-    if (_lhs->has_alignable_load()) return _lhs->base_addr();
-    else return _rhs->base_addr();
-  }
-};
-
-struct LShiftPattern : BinOpPattern {
-  virtual Node *generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen) {
-    assert(_opcode == Op_LShiftI, "sanity");
-    assert(_rhs->result()->is_Con(), "not implemented");
-
-    BasicType recurr_bt = recurr_t->array_element_basic_type();
-    Node *lhs = _lhs->generate(phase, recurr_t, vlen);
-
-    Node *multiplier = phase->igvn().intcon(1 << _rhs->result()->get_int());
-    // TODO: `make_vector` needs control dependency on loop entry
-    // control, without this dependency the vector initialization may
-    // be scheduled before the deciding on vector/scalar loop.
-    Node *result = VectorNode::make(Op_MulI, lhs, make_vector(phase, multiplier, recurr_t, vlen), vlen, recurr_bt);
-    //new MulVINode(lhs, make_vector(phase, multiplier, vlen),
-    //TypeVect::make(recurr_bt, vlen));
-    phase->igvn().register_new_node_with_optimizer(result);
-    return result;
-  }
-};
 
 struct ConMul {
   JavaValue multiplier;
@@ -791,285 +329,6 @@ Node *strip_conversions(Node *start, BasicType& bt) {
   }
 }
 
-ArrayLoadPattern *match_array_access(Node *start, Node *idx,
-                                     NodePred start_predicate,
-                                     bool allow_offset=false) {
-  ArrayLoadPattern *result = new ArrayLoadPattern();
-
-  ResourceMark rm;
-
-  enum {
-    LOAD_NODE,
-    LOAD_CTRL,
-    ARRAY,
-    MEMORY,
-    IDX_SHIFT_DISTANCE,
-    IDX_OFFSET,
-    ARRAY_BASE_OFFSET,
-    CAST_II,
-
-    N_REFS
-  };
-
-  MatchRefs refs(N_REFS);
-
-
-  Pattern *exact_idx = new ExactNodePattern(idx);
-
-  // FIXME: unnessecary initialization if allow_offset is false.
-  Pattern *idx_offset = new OpcodePattern<3>
-    (Op_AddI,
-     ANY,
-     exact_idx,
-     new CapturePattern(IDX_OFFSET));
-
-  Pattern *idx_pattern = allow_offset
-    ? new OrPattern(idx_offset, exact_idx)
-    : exact_idx;
-
-  Pattern *pre_shift = new OpcodePattern<2> // LShiftL: Left-hand side
-    (Op_ConvI2L,
-     ANY,                          // ConvI2L: Control
-     new OpcodePattern<2> // ConvI2L: Data
-     (Op_CastII,
-      ANY,                         // CastII:  Control
-      idx_pattern,   // CastII:  Index
-      CAST_II));
-
-  Pattern *shift = new OpcodePattern<3>  // AddP: Offset
-    (Op_LShiftL,
-     ANY,                           // LShiftL: Control
-     pre_shift,
-     new OpcodePattern<0>(Op_ConI, IDX_SHIFT_DISTANCE));
-
-  Pattern *p = new Pred2Pattern<3>
-    (start_predicate, // Match load nodes of primitive type.
-     new CapturePattern(LOAD_CTRL),
-     new CapturePattern(MEMORY),
-     new OpcodePattern<4>
-     (Op_AddP,
-      ANY,
-      ANY,
-      new OpcodePattern<4>
-      (Op_AddP,
-       ANY,                            // AddP: Control
-       ANY,                            // AddP: Base
-       new PredPattern(is_array_ptr, ARRAY), // AddP: Address
-       new OrPattern(shift, pre_shift)),
-      new OpcodePattern<0>(Op_ConL, ARRAY_BASE_OFFSET)),
-      LOAD_NODE);
-
-
-  // NOTE: If we start at a ConvI2L, skip that node and force _bt to
-  // T_LONG.
-  bool is_long = false;
-  if (start->Opcode() == Op_ConvI2L) {
-    is_long = true;
-    start = start->in(1);
-  }
-
-  if (p->match(start, refs)) {
-    result->_load_ctrl = refs[LOAD_CTRL];
-    result->_load = refs[LOAD_NODE];
-    result->_bt = is_long ? T_LONG : result->_load->bottom_type()->basic_type();
-    result->_index = idx;
-    result->_offset = refs[IDX_OFFSET];
-    result->_result = start;
-    result->_array_ptr = refs[ARRAY];
-    result->_memory = refs[MEMORY];
-    result->_elem_byte_size =
-      1 << (refs[IDX_SHIFT_DISTANCE] != NULL
-            ? refs[IDX_SHIFT_DISTANCE]->get_int()
-            : 0);
-    result->_base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
-
-    assert(result->_load_ctrl->isa_Proj(), "");
-    return result;
-  } else {
-    TRACE(Match, {
-        tty->print_cr("  origin array_read");
-      });
-    return NULL;
-  }
-}
-
-ArrayLoadPattern *match_array_read(Node *start, Node *idx,
-                                   bool allow_offset = false) {
-  return match_array_access(start, idx, is_primitive_load, allow_offset);
-}
-
-ArrayLoadPattern *match_array_store(Node *start, Node *idx,
-                                    bool allow_offset = false) {
-  return match_array_access(start, idx, is_primitive_store, allow_offset);
-}
-
-// // Match array read.
-// ArrayLoadPattern *match_array_read(Node *start, Node *idx,
-//                                    bool allow_offset=false) {
-//   ArrayLoadPattern *result = new ArrayLoadPattern();
-
-//   ResourceMark rm;
-
-//   enum {
-//     LOAD_NODE,
-//     LOAD_CTRL,
-//     ARRAY,
-//     MEMORY,
-//     IDX_SHIFT_DISTANCE,
-//     IDX_OFFSET,
-//     ARRAY_BASE_OFFSET,
-//     CAST_II,
-
-//     N_REFS
-//   };
-
-//   MatchRefs refs(N_REFS);
-
-
-//   Pattern *exact_idx = new ExactNodePattern(idx);
-
-//   // FIXME: unnessecary initialization if allow_offset is false.
-//   Pattern *idx_offset = new OpcodePattern<3>
-//     (Op_AddI,
-//      ANY,
-//      exact_idx,
-//      new CapturePattern(IDX_OFFSET));
-
-//   Pattern *idx_pattern = allow_offset
-//     ? new OrPattern(idx_offset, exact_idx)
-//     : exact_idx;
-
-//   Pattern *pre_shift = new OpcodePattern<2> // LShiftL: Left-hand side
-//     (Op_ConvI2L,
-//      ANY,                          // ConvI2L: Control
-//      new OpcodePattern<2> // ConvI2L: Data
-//      (Op_CastII,
-//       ANY,                         // CastII:  Control
-//       idx_pattern,   // CastII:  Index
-//       CAST_II));
-
-//   Pattern *shift = new OpcodePattern<3>  // AddP: Offset
-//     (Op_LShiftL,
-//      ANY,                           // LShiftL: Control
-//      pre_shift,
-//      new OpcodePattern<0>(Op_ConI, IDX_SHIFT_DISTANCE));
-
-//   Pattern *p = new Pred2Pattern<3>
-//     (is_primitive_load, // Match load nodes of primitive type.
-//      new CapturePattern(LOAD_CTRL),
-//      new CapturePattern(MEMORY),
-//      new OpcodePattern<4>
-//      (Op_AddP,
-//       ANY,
-//       ANY,
-//       new OpcodePattern<4>
-//       (Op_AddP,
-//        ANY,                            // AddP: Control
-//        ANY,                            // AddP: Base
-//        new PredPattern(is_array_ptr, ARRAY), // AddP: Address
-//        new OrPattern(shift, pre_shift)),
-//       new OpcodePattern<0>(Op_ConL, ARRAY_BASE_OFFSET)),
-//       LOAD_NODE);
-
-
-//   // NOTE: If we start at a ConvI2L, skip that node and force _bt to
-//   // T_LONG.
-//   bool is_long = false;
-//   if (start->Opcode() == Op_ConvI2L) {
-//     is_long = true;
-//     start = start->in(1);
-//   }
-
-//   if (p->match(start, refs)) {
-//     result->_load_ctrl = refs[LOAD_CTRL];
-//     result->_load = refs[LOAD_NODE];
-//     result->_bt = is_long ? T_LONG : result->_load->bottom_type()->basic_type();
-//     result->_index = idx;
-//     result->_offset = refs[IDX_OFFSET];
-//     result->_result = start;
-//     result->_array_ptr = refs[ARRAY];
-//     result->_memory = refs[MEMORY];
-//     result->_elem_byte_size =
-//       1 << (refs[IDX_SHIFT_DISTANCE] != NULL
-//             ? refs[IDX_SHIFT_DISTANCE]->get_int()
-//             : 0);
-//     result->_base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
-
-//     assert(result->_load_ctrl->isa_Proj(), "");
-//     return result;
-//   } else {
-//     TRACE(Match, {
-//         tty->print_cr("  origin array_read");
-//       });
-//     return NULL;
-//   }
-// }
-
-
-
-PatternInstance *match(Node *start, Node *iv);
-
-PatternInstance *match_binop(Node *start, Node *iv) {
-  // Only accept binary operations without control dependence.
-  if (!(is_binop(start) && start->in(0) == NULL)) return NULL;
-
-  Node *lhs = start->in(1);
-  Node *rhs = start->in(2);
-  assert(lhs != NULL && rhs != NULL, "sanity");
-
-  PatternInstance *lhs_p = match(lhs, iv);
-  if (lhs_p == NULL) return NULL;
-  PatternInstance *rhs_p = match(rhs, iv);
-  if (rhs_p == NULL) return NULL;
-
-  BinOpPattern *pi = start->Opcode() != Op_LShiftI
-    ? new BinOpPattern()
-    : new LShiftPattern();
-  pi->_opcode = start->Opcode();
-  pi->_lhs = lhs_p;
-  pi->_rhs = rhs_p;
-  pi->_bt = start->bottom_type()->array_element_basic_type();
-
-  return pi;
-}
-
-PatternInstance *match_scalar(Node *start) {
-  // NOTE: Assumes the scalar to be loop invariant. Presence of loop
-  // variant scalars should exit idiom vectorization early. To account
-  // for this, we currently only accept scalar constants.
-  if (start->Opcode() == Op_ConI || start->Opcode() == Op_ConF) {
-    ScalarPattern *p = new ScalarPattern();
-    p->_scalar = start;
-    return p;
-  } else {
-    return NULL;
-  }
-}
-
-PatternInstance *match(Node *start, Node *iv) {
-  PatternInstance *pi;
-  if (pi = match_array_read(start, iv))
-    return pi;
-  if (pi = match_binop(start, iv))
-    return pi;
-  if (pi = match_scalar(start))
-    return pi;
-
-  // // NOTE: Ignore conversions for now. Since we already know the type
-  // // of the recurrence variable these conversions are embedded within
-  // // our vector loads.
-  // if (start->Opcode() == Op_ConvI2L) {
-  //   assert(start->in(0) == NULL, "conversion has control");
-  //   return match(start->in(1), iv);
-  // }
-
-  TRACE(Match, {
-      tty->print_cr("Unable to find pattern instance.");
-      tty->print("  "); start->dump(" start node");
-    });
-
-  return NULL;
-}
 
 /****************************************************************
  * Pattern instance alignment.
@@ -1502,8 +761,6 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   const int VLEN = 4;
   const int ELEM_SZ = type2aelembytes(recurr_bt);
 
-
-
   tty->print_cr("GO_PREFIX_SUM!");
   // induction_phi->dump(" i.v.\n");
   // reduction_phi->dump(" r.v.\n");
@@ -1515,7 +772,7 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
 
   tty->print_cr("Passed first checks!");
 
-  ArrayLoadPattern *store_inst = match_array_store(store, induction_phi, true);
+  ArrayStorePattern *store_inst = match_array_store(store, induction_phi, true);
   if (store_inst == NULL) return false;
   ArrayLoadPattern *lhs = match_array_read(stored_value->in(1), induction_phi, true);
   ArrayLoadPattern *rhs = match_array_read(stored_value->in(2), induction_phi, true);
@@ -1527,12 +784,12 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   ArrayLoadPattern *c;
 
   // One and only one offset of -1 required.
-  if (lhs->_offset == NULL && rhs->_offset == NULL) {
+  if (lhs->_access->_offset == NULL && rhs->_access->_offset == NULL) {
     return false;
-  } else if (lhs->_offset == NULL && rhs->_offset != NULL) {
+  } else if (lhs->_access->_offset == NULL && rhs->_access->_offset != NULL) {
     prefix = rhs;
     c = lhs;
-  } else if (rhs->_offset == NULL && lhs->_offset != NULL) {
+  } else if (rhs->_access->_offset == NULL && lhs->_access->_offset != NULL) {
     prefix = lhs;
     c = rhs;
   } else {
@@ -1542,8 +799,8 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   tty->print_cr("Passed initial offset check!");
 
   bool prefix_has_decremented_offset =
-    prefix->_offset->is_Con() && prefix->_offset->get_int() == -1 &&
-    store_inst->_offset == NULL;
+    prefix->_access->_offset->is_Con() && prefix->_access->_offset->get_int() == -1 &&
+    store_inst->_access->_offset == NULL;
   bool same_array = prefix->base_addr() == store_inst->base_addr();
   if (!prefix_has_decremented_offset || !same_array) return false;
 
@@ -1562,7 +819,7 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   Node *prefix_phi = PhiNode::make(induction_phi->in(PhiNode::Region), initial_prefix);
   igvn.register_new_node_with_optimizer(prefix_phi);
 
-  Node *c_load = c->generate(phase, recurr_t, VLEN);
+  Node *c_load = c->generate(phase, recurr_t, VLEN, reduction_phi, induction_phi);
   Node *last_add = c_load;
   // Hillis and Steele parallel prefix sum algorithm:
   for (int i = 1; i < VLEN; i <<= 1) {
@@ -1692,10 +949,10 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
     tty->print_cr("Found reduction phi N%d", reduction_phi->_idx);
   });
 
-  if (GO_PREFIX_SUM) {
-    C->set_max_vector_size(16); // FIXME: Make shared for different patterns.
-    return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
-  }
+  // if (GO_PREFIX_SUM) {
+  //   C->set_max_vector_size(16); // FIXME: Make shared for different patterns.
+  //   return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
+  // }
 
   // Right hand side of the assignment.
   Node *rhs = find_rhs(reduction_phi); //find_rhs(acc_add, reduction_phi);
@@ -1703,6 +960,14 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
   TRACE(MinCond, {
       tty->print_cr("Found right-hand-side N%d", rhs->_idx);
     });
+
+  PatternInstance *_pi = match(rhs, induction_phi); //->dump();
+  tty->print_cr("Before reduce");
+  _pi->dump();
+  tty->print_cr("After reduce");
+  _pi = _pi->reduce(reduction_phi, induction_phi);
+  _pi->dump();
+
 
 
   /**************************************************************
@@ -1772,7 +1037,7 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
     ResourceMark rm;
     PatternInstance *pi = match(start->in(2), induction_phi);
     assert(pi != NULL, "");
-    c_term = pi->generate(phase, recurr_t, VLEN);
+    c_term = pi->generate(phase, recurr_t, VLEN, reduction_phi, induction_phi);
   }
 
   // Split loop.
