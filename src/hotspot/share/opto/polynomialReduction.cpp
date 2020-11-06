@@ -23,10 +23,8 @@
  ***************************************************************/
 struct PatternInstance;
 
-template<typename T>
-T my_pow(T n, jint exp);
-
-const int TRACE_OPTS = Match | MinCond;
+const int TRACE_OPTS = //MinCond | // Match | MinCond
+  NoTraceOpts;
 
 /****************************************************************
  * Map dense Node indices to PatternInstances.
@@ -51,7 +49,6 @@ class Node2Instance : public ResourceObj {
  ****************************************************************/
 
 
-
 /****************************************************************
  * Minimum matching condition.
  ****************************************************************/
@@ -61,7 +58,7 @@ bool has_control_flow(CountedLoopNode *cl) {
   return exit->in(0) == cl;
 }
 
-PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory=false) {
+PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory) {
   // Find _the_ phi node connected with a control edge from the given
   // CountedLoop (excluding the phi node associated with the induction
   // variable).
@@ -334,10 +331,10 @@ Node *strip_conversions(Node *start, BasicType& bt) {
  * Pattern instance alignment.
  ****************************************************************/
 
-struct AlignInfo {
-  Node *_base_addr;
-  BasicType _elem_bt;
-};
+// struct AlignInfo {
+//   Node *_base_addr;
+//   BasicType _elem_bt;
+// };
 
 // Number of iterations that are to be taken to satisfy alignment constraints.
 // Constant folded down to a `&`, `-`, and `<<`.
@@ -355,9 +352,12 @@ Node *pre_loop_align_limit(PhaseIterGVN &igvn, Node *target_align,
 }
 
 void align_first_main_loop_iters(PhaseIterGVN &igvn, CountedLoopNode *pre_loop, Node *orig_limit,
-                                AlignInfo align, int vlen) {
-  Node *base = align._base_addr;
-  Node *base_offset = igvn.intcon(arrayOopDesc::base_offset_in_bytes(align._elem_bt));
+                                 AlignInfo *align, int vlen) {
+  tty->print_cr("Aligning main loop: N%d + %d, preferred align: %d bits",
+                align->_base_ptr->_idx, align->_base_offset,
+                align->_preferred_align * 8);
+  Node *base = align->_base_ptr;
+  Node *base_offset = igvn.longcon(align->_base_offset);
   Node *first_elem_ptr = igvn.transform(new AddPNode(base, base, base_offset));
   Node *x_elem_ptr = igvn.transform(new CastP2XNode(NULL, first_elem_ptr));
 #ifdef _LP64
@@ -367,11 +367,11 @@ void align_first_main_loop_iters(PhaseIterGVN &igvn, CountedLoopNode *pre_loop, 
   x_elem_ptr = new ConvL2INode(x_elem_ptr);
   igvn.register_new_node_with_optimizer(x_elem_ptr);
 #endif
-  uint target_align = type2aelembytes(align._elem_bt)*vlen;
-  Node *target_align_con = igvn.intcon(target_align);
+  // uint target_align = type2aelembytes(align._elem_bt)*vlen;
+  Node *target_align_con = igvn.intcon(align->_preferred_align);
 
   Node *new_limit = pre_loop_align_limit(igvn, target_align_con, x_elem_ptr,
-                                         type2aelembytes(align._elem_bt));
+                                         align->_bytes_per_iter);
   Node *constrained_limit = new MinINode(orig_limit, new_limit);
   igvn.register_new_node_with_optimizer(constrained_limit);
 
@@ -444,26 +444,57 @@ bool is_associative(int opc) {
   }
 }
 
+bool is_semiassociative(int opc) {
+  if (is_associative(opc)) return true;
+
+  switch (opc) {
+  case Op_SubI:
+  case Op_SubL:
+  case Op_SubF:
+  case Op_SubD:
+    return true;
+  default:
+    return false;
+  }
+}
+
+int reduction_opcode(int opc) {
+  assert(is_semiassociative(opc), "operator not semi-associative");
+  switch (opc) {
+  case Op_SubI: return Op_AddI;
+  case Op_SubL: return Op_AddL;
+  case Op_SubF: return Op_AddF;
+  case Op_SubD: return Op_AddD;
+  default:
+    assert(is_associative(opc), "operator not associative");
+    return opc;
+  }
+}
+
 // Return a constant holding the identity of the given scalar opcode.
 Node *identity_con(int opc) {
-  assert(is_associative(opc), "expected");
+  assert(is_semiassociative(opc), "expected");
   switch (opc) {
   // Additive identity (0):
   case Op_AddI:
+  case Op_SubI:
   case Op_OrI:
   case Op_XorI:
   case Op_MaxI:
   case Op_MinI:
     return ConNode::make(TypeInt::make(0));
   case Op_AddL:
+  case Op_SubL:
   case Op_OrL:
   case Op_XorL:
     return ConNode::make(TypeLong::make(0));
   case Op_AddF:
+  case Op_SubF:
   case Op_MaxF:
   case Op_MinF:
     return ConNode::make(TypeF::make(0));
   case Op_AddD:
+  case Op_SubD:
   case Op_MaxD:
   case Op_MinD:
     return ConNode::make(TypeD::make(0));
@@ -621,14 +652,21 @@ Node *make_exp_vector(PhaseIdealLoop *phase, JavaValue n, juint vlen, const Type
   }
 
   if (vector_bytes == 32) {
-    Node *a = igvn.transform(ConNode::make(TypeLong::make(make_exp_vector_part(0, n, elem_bytes, bt))));
-    Node *b = igvn.transform(ConNode::make(TypeLong::make(make_exp_vector_part(1, n, elem_bytes, bt))));
-    Node *c = igvn.transform(ConNode::make(TypeLong::make(make_exp_vector_part(2, n, elem_bytes, bt))));
-    Node *d = igvn.transform(ConNode::make(TypeLong::make(make_exp_vector_part(3, n, elem_bytes, bt))));
-    Node *con_lo = igvn.transform(VectorNode::scalars2vector(d, c, bt));
-    Node *con_hi = igvn.transform(VectorNode::scalars2vector(b, a, bt));
+    Node *a = ConNode::make(TypeLong::make(make_exp_vector_part(0, n, elem_bytes, bt)));
+    Node *b = ConNode::make(TypeLong::make(make_exp_vector_part(1, n, elem_bytes, bt)));
+    Node *c = ConNode::make(TypeLong::make(make_exp_vector_part(2, n, elem_bytes, bt)));
+    Node *d = ConNode::make(TypeLong::make(make_exp_vector_part(3, n, elem_bytes, bt)));
+    Node *con_lo = VectorNode::scalars2vector(d, c, bt);
+    Node *con_hi = VectorNode::scalars2vector(b, a, bt);
     Node *con = VectorNode::scalars2vector(con_lo, con_hi, bt);
-    if (control) con->set_req(0, control);
+    if (control != NULL) {
+      con_lo->set_req(0, control);
+      con_hi->set_req(0, control);
+      con->set_req(0, control);
+      igvn.register_new_node_with_optimizer(con_lo);
+      igvn.register_new_node_with_optimizer(con_hi);
+      igvn.register_new_node_with_optimizer(con);
+    }
 
     return igvn.transform(con);
   }
@@ -676,8 +714,10 @@ Node *split_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase,
   Node *zero_opaq_ctrl = phase->get_ctrl(zero_opaq);
 
   Node *adjusted_limit = new SubINode(zero_opaq, phase->igvn().intcon(vlen));
+  Node *adjusted_opaq = new Opaque1Node(phase->C, adjusted_limit);
   phase->igvn().register_new_node_with_optimizer(adjusted_limit);
-  phase->igvn().replace_input_of(zero_cmp, 2, adjusted_limit);
+  phase->igvn().register_new_node_with_optimizer(adjusted_opaq);
+  phase->igvn().replace_input_of(zero_cmp, 2, adjusted_opaq);
 
   return adjusted_limit;
 }
@@ -688,6 +728,9 @@ void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
 
   ConNode *stride = ConNode::make(TypeInt::make(new_stride));
   phase->igvn().register_new_node_with_optimizer(stride);
+
+  cl->set_profile_trip_cnt(cl->profile_trip_cnt() / new_stride);
+  // cl->set_trip_count(cl->trip_count() / new_stride);
 
   Node *incr = cl->incr();
   if (incr != NULL && incr->req() == 3) {
@@ -741,144 +784,59 @@ int prologue_cost() {
   return 0;
 }
 
-int epilogue_cost() {
-  // TODO
+float epilogue_cost(int vlen, BasicType bt) {
+  // TODO:
   return 0;
+}
+
+int round_up(int number, int multiple) {
+  int remainder = number % multiple;
+  return remainder == 0 ? number : number + multiple - remainder;
 }
 
 // Return an estimation of the minumum number of trips that has to be
 // taken for the vectorized loop to be profitable.
-int min_profitable_trips() {
-  // TODO
-  return 0;
-}
+int min_profitable_trips(int vlen, BasicType bt,
+                         PatternInstance* pi,
+                         int max_pre_iters) {
+  return 1;
+  float missed_unroll_trip_cost = 2*vlen;
+  float cost = missed_unroll_trip_cost;
+  float ilp_trip_cost = 0;
 
-bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *cl, PhaseIterGVN &igvn,
-                   Node *induction_phi, Node *reduction_phi) {
-  // FIXME: Hardcoded constants for now...
-  const Type *recurr_t = TypeInt::INT;
-  const BasicType recurr_bt = T_INT;
-  const int VLEN = 4;
-  const int ELEM_SZ = type2aelembytes(recurr_bt);
-
-  tty->print_cr("GO_PREFIX_SUM!");
-  // induction_phi->dump(" i.v.\n");
-  // reduction_phi->dump(" r.v.\n");
-
-  Node *store = reduction_phi->in(2);
-  if (!store->is_Store()) return false;
-  Node *stored_value = store->in(3);
-  if (!stored_value->is_Add()) return false;
-
-  tty->print_cr("Passed first checks!");
-
-  ArrayStorePattern *store_inst = match_array_store(store, induction_phi, true);
-  if (store_inst == NULL) return false;
-  ArrayLoadPattern *lhs = match_array_read(stored_value->in(1), induction_phi, true);
-  ArrayLoadPattern *rhs = match_array_read(stored_value->in(2), induction_phi, true);
-  if (rhs == NULL || lhs == NULL) return false;
-
-  tty->print_cr("Passed matching!");
-
-  ArrayLoadPattern *prefix;
-  ArrayLoadPattern *c;
-
-  // One and only one offset of -1 required.
-  if (lhs->_access->_offset == NULL && rhs->_access->_offset == NULL) {
-    return false;
-  } else if (lhs->_access->_offset == NULL && rhs->_access->_offset != NULL) {
-    prefix = rhs;
-    c = lhs;
-  } else if (rhs->_access->_offset == NULL && lhs->_access->_offset != NULL) {
-    prefix = lhs;
-    c = rhs;
-  } else {
-    return false;
+  if (pi->op() == PatternInstance::Reduction) {
+    ReductionPattern *reduction = static_cast<ReductionPattern*>(pi);
+    if (!reduction->_scaled) {
+      switch (bt) {
+      case T_DOUBLE:
+        return (vlen == 2 ? 11 : 21) + max_pre_iters;
+      case T_FLOAT:
+        return (vlen == 4 ? 12 : 24) + max_pre_iters;
+      case T_INT:
+        return (vlen == 4 ? 40 : 80) + max_pre_iters;
+      // case T_SHORT: return (vlen == 8 ? )
+      default: break;
+      }
+    } else {
+      switch (bt) {
+      case T_INT:
+        return (vlen == 4 ? 12 : 24) + max_pre_iters;
+      case T_BYTE:
+        return 0;
+      default: break;
+      }
+    }
   }
 
-  tty->print_cr("Passed initial offset check!");
-
-  bool prefix_has_decremented_offset =
-    prefix->_access->_offset->is_Con() && prefix->_access->_offset->get_int() == -1 &&
-    store_inst->_access->_offset == NULL;
-  bool same_array = prefix->base_addr() == store_inst->base_addr();
-  if (!prefix_has_decremented_offset || !same_array) return false;
-
-  tty->print_cr("Passed offset/memory constraints!");
-
-  Node_List old_new;
-  Node *orig_limit = cl->limit();
-  Node *new_limit = split_loop(lpt, phase, cl, VLEN, old_new);
-  set_stride(cl, phase, VLEN);
-  adjust_limit(cl, phase->igvn(), new_limit);
-
-  Node *pre_stored_value = old_new[stored_value->_idx];
-
-  Node *initial_prefix = VectorNode::scalar2vector(pre_stored_value, VLEN, recurr_t);
-  igvn.register_new_node_with_optimizer(initial_prefix);
-  Node *prefix_phi = PhiNode::make(induction_phi->in(PhiNode::Region), initial_prefix);
-  igvn.register_new_node_with_optimizer(prefix_phi);
-
-  Node *c_load = c->generate(phase, recurr_t, VLEN, reduction_phi, induction_phi);
-  Node *last_add = c_load;
-  // Hillis and Steele parallel prefix sum algorithm:
-  for (int i = 1; i < VLEN; i <<= 1) {
-    Node *shift = new ElemLShiftVNode(last_add, igvn.intcon(ELEM_SZ*i),
-                                      TypeVect::make(recurr_bt, VLEN));
-    Node *add = VectorNode::make(Op_AddI, last_add, shift, VLEN, recurr_bt);
-    igvn.register_new_node_with_optimizer(shift);
-    igvn.register_new_node_with_optimizer(add);
-    last_add = add;
-  }
-
-
-  // Node *shift1 = new ElemLShiftVNode(c_load, igvn.intcon(1*4), TypeVect::make(recurr_bt, VLEN));
-  // Node *add1 = VectorNode::make(Op_AddI, c_load, shift1, VLEN, recurr_bt);
-  // igvn.register_new_node_with_optimizer(shift1);
-  // igvn.register_new_node_with_optimizer(add1);
-  // Node *shift2 = new ElemLShiftVNode(add1, igvn.intcon(2*4), TypeVect::make(recurr_bt, VLEN));
-  // Node *add2 = VectorNode::make(Op_AddI, add1, shift2, VLEN, recurr_bt);
-  // igvn.register_new_node_with_optimizer(shift2);
-  // igvn.register_new_node_with_optimizer(add2);
-
-  Node *prev_prefix_add = VectorNode::make(Op_AddI, prefix_phi, last_add, VLEN, recurr_bt);
-  igvn.register_new_node_with_optimizer(prev_prefix_add);
-
-  Node *extract_last = new ExtractINode(prev_prefix_add, igvn.intcon(3));
-  igvn.register_new_node_with_optimizer(extract_last);
-  Node *repl_last = new ReplicateINode(extract_last, TypeVect::make(recurr_bt, VLEN));
-  igvn.register_new_node_with_optimizer(repl_last);
-  prefix_phi->set_req(2, repl_last);
-
-  StoreVectorNode *storev = StoreVectorNode::make(store->Opcode(),
-                                                  store->in(MemNode::Control),
-                                                  store->in(MemNode::Memory),
-                                                  store->in(MemNode::Address),
-                                                  store->adr_type(), prev_prefix_add, VLEN);
-  igvn.register_new_node_with_optimizer(storev);
-  igvn.replace_node(store, storev);
-  igvn.remove_dead_node(store);
-
-  // We want to check that:
-  //
-  // - The prefix and c term shares memory state with the right hand
-  // side of the assignment.
-  //
-  // - The prefix term shares the same address as the right hand side
-  // - of the assignment (but decremented).
-
-  tty->print_cr("Found prefix sum!");
-
-  // prefix->_load->dump(" PREFIX\n");
-  // c->_load->dump(" C_i\n");
-
-  return true;
+  return 2*vlen + max_pre_iters;
 }
 
 // Clone the loop to be vectorized, where the cloned, unvectorized,
 // loop is picked for low tripcounts.
-void build_loop_variants(PhaseIdealLoop *phase, IdealLoopTree *lpt,
-                         CountedLoopNode *cl) {
+void build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
+                          CountedLoopNode *cl, BasicType bt, int vlen,
+                          PatternInstance *pi, int max_pre_iters=1) {
+  //cl->mark_is_multiversioned();
   TRACE(Rewrite, {
       tty->print_cr("Start loop variants");
     });
@@ -887,21 +845,18 @@ void build_loop_variants(PhaseIdealLoop *phase, IdealLoopTree *lpt,
   // Projection node for the vectorized loop.
   ProjNode *proj_true = phase->create_slow_version_of_loop(
     lpt, old_new, Op_If,
-    PhaseIdealLoop::CloneIncludesStripMined);
+    PhaseIdealLoop::ControlAroundStripMined);
 
   CountedLoopNode *slow_cl = old_new[cl->_idx]->as_CountedLoop();
-  slow_cl->mark_was_idiom_analyzed();
   slow_cl->mark_passed_idiom_analysis();
+  tty->print_cr("     Slow CL idx: %d", slow_cl->_idx);
 
-  const int scalar_limit = 5;
+  const int scalar_limit = min_profitable_trips(vlen, bt, pi, max_pre_iters);
 
   // Limit the profile trip count on the slow loop to account for the
   // scalar limit.
-  float trip_cnt = MIN2<float>(slow_cl->profile_trip_cnt(), scalar_limit / 2.0f);
-  slow_cl->set_profile_trip_cnt(trip_cnt);
-
-  // tty->print_cr("slow_cl N%d (end N%d)", slow_cl->_idx,
-  //               slow_cl->loopexit()->_idx);
+  float trip_cnt = MIN2<float>(slow_cl->profile_trip_cnt(), scalar_limit);
+  // slow_cl->set_profile_trip_cnt(trip_cnt);
 
   // Take the vectorized loop if cl->limit() >= scalar_limit.
   CmpINode *cmp = new CmpINode(cl->limit(), phase->igvn().intcon(scalar_limit));
@@ -911,7 +866,6 @@ void build_loop_variants(PhaseIdealLoop *phase, IdealLoopTree *lpt,
 
   IfNode *iff = proj_true->in(0)->as_If();
   phase->igvn().replace_input_of(iff, 1, ge);
-  //iff->_prob = .0f;
 
   TRACE(Rewrite, {
       tty->print_cr("End loop variants");
@@ -923,14 +877,149 @@ void build_loop_variants(PhaseIdealLoop *phase, IdealLoopTree *lpt,
     Node *n_clone = old_new[n->_idx];
     phase->igvn()._worklist.push(n_clone);
   }
-
 }
+
+struct LoopVariantInfo {
+  CountedLoopNode *variant;
+  Node *start;
+};
+
+
+void rewrite_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *cl,
+                  PatternInstance *pi, Node *start, const Type* recurr_t, int VLEN,
+                  Node *reduction_phi, Node *induction_phi) {
+  Node_List old_new;
+  Node *orig_limit = cl->limit();
+  Node *new_limit = split_loop(lpt, phase, cl, VLEN, old_new);
+  set_stride(cl, phase, VLEN);
+  adjust_limit(cl, phase->igvn(), new_limit);
+
+  Node *loop_entry_ctrl = cl->skip_strip_mined()->in(LoopNode::EntryControl);
+  Node *start_replace = pi->generate(phase, recurr_t, VLEN, reduction_phi,
+                                     induction_phi, loop_entry_ctrl, old_new,
+                                     lpt);
+  assert(start_replace != NULL, "no ir generated");
+  //igvn.register_new_node_with_optimizer(start_replace);
+  phase->igvn().replace_node(start, start_replace);
+  phase->igvn().remove_dead_node(start);
+}
+
+bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *cl, PhaseIterGVN &igvn,
+                   Node *induction_phi, Node *reduction_phi) {
+
+  Node *start = reduction_phi->in(2);
+  PatternInstance* pi = match(start, induction_phi);
+  if (pi == NULL) return false;
+#ifndef PRODUCT
+    tty->print_cr("Before reduction");
+    pi->dump(4);
+#endif
+
+  pi = pi->reduce(reduction_phi, induction_phi);
+
+  if (!pi->is_rewritable_idiom()) {
+#ifndef PRODUCT
+    tty->print_cr("Failed idiom");
+    pi->dump(4);
+#endif
+    return false;
+  }
+
+  const BasicType recurr_bt = pi->velt();
+  const Type *recurr_t = Type::get_const_basic_type(recurr_bt);
+  const int VLEN = SuperWordPolynomialWidth / type2aelembytes(recurr_bt);
+
+  // Skip vectorization when trip-count is expected to be below profitability.
+  int pre_iters = SuperWordPolynomialAlign ? VLEN : 1;
+  lpt->compute_profile_trip_cnt(phase);
+  if (round(cl->profile_trip_cnt()) < min_profitable_trips(VLEN, recurr_bt, pi, pre_iters)) {
+    tty->print_cr("PTC bailout (actual %f, target %d pres %d)",
+                  round(cl->profile_trip_cnt()),
+                  min_profitable_trips(VLEN, recurr_bt, pi, pre_iters),
+                  pre_iters);
+    return false;
+  }
+  assert(is_power_of_2(VLEN), "santiy");
+  phase->C->set_max_vector_size(SuperWordPolynomialWidth); // FIXME: Make shared for different patterns.
+
+  LoopVariantInfo aggressive;
+  if (SuperWordPolynomialMultiversion) {
+    build_scalar_variant(phase, lpt, cl, recurr_bt, VLEN, pi, pre_iters);
+  }
+
+
+  Node_List old_new;
+  Node *orig_limit = cl->limit();
+  Node *orig_incr = cl->incr();
+  Node *new_limit = split_loop(lpt, phase, cl, VLEN, old_new);
+  set_stride(cl, phase, VLEN);
+  adjust_limit(cl, phase->igvn(), new_limit);
+
+  if (SuperWordPolynomialAlign) {
+    AlignInfo *align_info = pi->align_info(VLEN);
+
+    if (align_info != NULL) {
+      align_first_main_loop_iters(igvn, find_pre_loop(cl), orig_limit,
+                                  align_info, VLEN);
+    }
+  }
+
+  Node *loop_entry_ctrl = cl->skip_strip_mined()->in(LoopNode::EntryControl);
+  Node *start_replace = pi->generate(phase, recurr_t, VLEN, reduction_phi,
+                                     induction_phi, loop_entry_ctrl, old_new,
+                                     lpt);
+
+  // start_replace->set_req(0, cl->loopexit()->proj_out(false));
+  assert(start_replace != NULL, "no ir generated");
+  //igvn.register_new_node_with_optimizer(start_replace);
+  igvn.replace_node(start, start_replace);
+  //phase->set_ctrl(start_replace, cl->loopexit()->proj_out(false));
+
+  // igvn.remove_dead_node(start);
+
+  // if (pi->op() == PatternInstance::Reduction) {
+  //   // NOTE: Ugly, possibly very unsafe hack, removing the need to
+  //   // perform a horizontal vector reduction every iteration.
+  //   if (Node *sp = start_replace->find_out_with(Op_SafePoint)) {
+  //     sp->replace_edge(start_replace, old_new[start->_idx]);
+  //     sp->replace_edge(orig_incr, old_new[orig_incr->_idx]);
+  //   }
+  // }
+
+  static int total_vectorized_loops = 0;
+  Compile *c = igvn.C;
+  Method *m = c->method()->get_Method();
+  if (c->_compile_id != m->_n_vectorized_loops_comp_idx) {
+    m->_n_vectorized_loops_comp_idx = c->_compile_id;
+    total_vectorized_loops -= m->_n_vectorized_loops;
+    m->_n_vectorized_loops = 0;
+  }
+  // cl->set_slp_max_unroll(VLEN);
+  m->_n_vectorized_loops++;
+  total_vectorized_loops++;
+
+
+  int n_doublings = exact_log2(VLEN);
+  while (n_doublings--) {
+    cl->double_unrolled_count();
+  }
+
+  tty->print_cr("idiom in %s::%s (ptc: %f) (total: %d) (min trips: %d) (cl idx: %d)",
+                m->klass_name()->as_utf8(),
+                m->name()->as_utf8(),
+                cl->profile_trip_cnt(),
+                total_vectorized_loops,
+                min_profitable_trips(VLEN, recurr_bt, pi, 1),
+                cl->_idx);
+
+  return true;
+}
+
 
 bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
                  PhaseIterGVN *igvn, CountedLoopNode *cl) {
   const juint VBYTES = SuperWordPolynomialWidth;
   const bool GO_PREFIX_SUM = true;
-
   /**************************************************************
    * Find induction and reduction phis, and right hand side of
    * scalar reduction.
@@ -949,10 +1038,9 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
     tty->print_cr("Found reduction phi N%d", reduction_phi->_idx);
   });
 
-  // if (GO_PREFIX_SUM) {
-  //   C->set_max_vector_size(16); // FIXME: Make shared for different patterns.
-  //   return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
-  // }
+  if (GO_PREFIX_SUM) {
+    return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
+  }
 
   // Right hand side of the assignment.
   Node *rhs = find_rhs(reduction_phi); //find_rhs(acc_add, reduction_phi);
@@ -967,8 +1055,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
   tty->print_cr("After reduce");
   _pi = _pi->reduce(reduction_phi, induction_phi);
   _pi->dump();
-
-
 
   /**************************************************************
    * Strip away any integer downcasts and determine type of
@@ -1005,7 +1091,7 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
    **************************************************************/
   const juint VLEN = VBYTES / type2aelembytes(recurr_bt);
 
-  AlignInfo align;
+  AlignInfo* align;
   bool attempt_align = false;
 
   {
@@ -1014,19 +1100,19 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
     PatternInstance *pi = match(start->in(2), induction_phi);
     if (pi == NULL)
       return false;
-    if (pi->has_alignable_load()) {
-      attempt_align = true;
-      align._base_addr = pi->base_addr();
-      align._elem_bt = pi->elem_bt();
-    }
+    // if (pi->has_alignable_load()) {
+    //   attempt_align = true;
+    //   align._base_addr = pi->base_addr();
+    //   align._elem_bt = pi->elem_bt();
+    // }
   }
 
   /**************************************************************
    * Vectorize IR (point of no return).
    **************************************************************/
-  if (SuperWordPolynomialMultiversion) {
-    build_loop_variants(phase, lpt, cl);
-  }
+  // if (SuperWordPolynomialMultiversion) {
+  //   build_scalar_variant(phase, lpt, cl, VLEN);
+  // }
 
   // FIXME: To avoid nesting of resource marks when calling
   // `build_loop_variants` we redo the matching, avoiding
@@ -1037,7 +1123,9 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
     ResourceMark rm;
     PatternInstance *pi = match(start->in(2), induction_phi);
     assert(pi != NULL, "");
-    c_term = pi->generate(phase, recurr_t, VLEN, reduction_phi, induction_phi);
+    Node_List _;
+    c_term = pi->generate(phase, recurr_t, VLEN, reduction_phi, induction_phi, NULL, _,
+                          lpt);
   }
 
   // Split loop.
@@ -1064,11 +1152,6 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
 
   Node *identity = phase->igvn().transform(identity_con(op_reduce));
   Node *identities = make_vector(phase, identity, recurr_t, VLEN, loop_entry_ctrl);
-  //phase->set_loop(identities, lpt);
-  // phase->set_ctrl(identities, loop_entry_ctrl);
-  //phase->set_ctrl(identities, cl);
-  //phase->set_ctrl_and_loop(identities, cl);
-
 
   Node *initial_acc = new PromoteNode(identities, reduction_phi->in(1),
                                       TypeVect::make(recurr_bt, VLEN));
@@ -1118,8 +1201,8 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
 
   phase->igvn().replace_node(rhs, reduce); // Replace right hand side with reduction.
 
-  int n_unrolls = exact_log2(VLEN);
-  while (n_unrolls--) {
+  int n_doublings = exact_log2(VLEN);
+  while (n_doublings--) {
     cl->double_unrolled_count();
   }
 
@@ -1130,10 +1213,12 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
   if (!SuperWordPolynomial) return false;
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
+
   // NOTE: If removing the `is_normal_loop` check, make sure to do
   // this check inside `split_loop`:
   if (cl->has_passed_idiom_analysis() || cl->is_vectorized_loop() ||
       !cl->is_normal_loop()) return false;
+  if (cl->is_unroll_only()) return false;
 
   TRACE(Candidates, {
       tty->print_cr("Initial analysis of %s::%s",
@@ -1144,12 +1229,9 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
   if (!cl->stride_is_con() || cl->stride_con() != 1) return false;
   TRACE(Candidates, { tty->print_cr("  Loop is constant unit-stride"); });
 
-  // NOTE: Do we need/want this one?
   if (cl->range_checks_present()) return false;
 
   TRACE(Candidates, { tty->print_cr("  Loop has no range checks"); });
-
-  //if (has_control_flow(cl)) return false;
 
   TRACE(Candidates, {
       tty->print_cr("  Loop has trivial control flow");
@@ -1164,6 +1246,7 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
                     C->method()->get_Method()->name()->as_utf8());
     });
 
+  phase->ltree_root()->dump();
   bool ok = build_stuff(C, lpt, phase, igvn, cl);
   cl->mark_was_idiom_analyzed();
   if (ok) {
@@ -1176,6 +1259,13 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
 
     cl->mark_passed_idiom_analysis();
     cl->mark_loop_vectorized();
+    cl->mark_passed_slp();
+    cl->mark_was_slp();
+    int n_doublings = exact_log2(8);
+    while (n_doublings--) {
+      cl->double_unrolled_count();
+    }
+
     C->print_method(PHASE_AFTER_IDIOM_VECTORIZATION);
     return true;
   } else {

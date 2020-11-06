@@ -1,10 +1,11 @@
 #ifndef SHARE_OPTO_IDIOMMATCH_HPP
 #define SHARE_OPTO_IDIOMMATCH_HPP
 
-#include "precompiled.hpp"
+//#include "precompiled.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "opto/node.hpp"
 #include "opto/polynomialReduction.hpp"
+#include "opto/idiomPattern.hpp"
 
 /****************************************************************
  * Predicates.
@@ -252,5 +253,20 @@ public:
     return true;
   }
 };
+
+/****************************************************************
+ * Matching.
+ ****************************************************************/
+ArrayAccessPattern *match_array_access(Node *start, Node *idx,
+                                     NodePred start_predicate,
+                                     bool allow_offset=false);
+ArrayLoadPattern *match_array_read(Node *start, Node *idx,
+                                   bool allow_offset = false);
+ArrayStorePattern *match_array_store(Node *start, Node *idx,
+                                    bool allow_offset = false);
+PatternInstance *match_binop(Node *start, Node *iv);
+PatternInstance *match_scalar(Node *start);
+PatternInstance *match_prefix_sum(Node *start, Node *iv);
+PatternInstance *match(Node *start, Node *iv);
 
 #endif

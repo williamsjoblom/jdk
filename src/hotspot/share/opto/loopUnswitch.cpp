@@ -117,7 +117,6 @@ IfNode* PhaseIdealLoop::find_unswitching_candidate(const IdealLoopTree *loop) co
 // insert a clone of the test that selects which version to
 // execute.
 void PhaseIdealLoop::do_unswitching(IdealLoopTree *loop, Node_List &old_new) {
-
   LoopNode *head = loop->_head->as_Loop();
   Node* entry = head->skip_strip_mined()->in(LoopNode::EntryControl);
   if (find_predicate_insertion_point(entry, Deoptimization::Reason_loop_limit_check) != NULL

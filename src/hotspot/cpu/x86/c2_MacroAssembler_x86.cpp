@@ -1112,8 +1112,14 @@ void C2_MacroAssembler::reduce8S(int opcode, Register dst, Register src1,
 void C2_MacroAssembler::reduce16S(int opcode, Register dst, Register src1,
                                   XMMRegister src2, XMMRegister vtmp1,
                                   XMMRegister vtmp2) {
-  assert(false, "not implemented for 256 bit vectors");
+  //assert(false, "not implemented for 256 bit vectors");
   assert(opcode == Op_AddReductionVS, "");
+  if (vtmp1 != src2) {
+    vmovdqu(vtmp1, src2);
+  }
+  vextracti128_high(vtmp2, src2);
+  vpaddw(vtmp1, vtmp1, vtmp2, Assembler::AVX_128bit);
+  reduce8S(opcode, dst, src1, vtmp1, vtmp1, vtmp2);
 }
 
 void C2_MacroAssembler::reduce32S(int opcode, Register dst, Register src1,

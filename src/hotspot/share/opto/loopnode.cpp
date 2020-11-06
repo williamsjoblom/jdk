@@ -2651,7 +2651,6 @@ uint IdealLoopTree::est_loop_flow_merge_sz() const {
   }
   return 0;
 }
-
 #ifndef PRODUCT
 //------------------------------dump_head--------------------------------------
 // Dump 1 liner for loop header info
@@ -3076,6 +3075,8 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     _ltree_root->counted_loop( this );
   }
 
+  // C->print_method(PHASE_FAILED_IDIOM_VECTORIZATION);
+
   // Find latest loop placement.  Find ideal loop placement.
   visited.clear();
   init_dom_lca_tags();
@@ -3176,6 +3177,8 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     return;
   }
 
+
+
   if (ReassociateInvariants) {
     // Reassociate invariants and prep for split_thru_phi
     for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
@@ -3225,6 +3228,18 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     }
   }
 
+  // wilsj
+  if (C->has_loops() && mode == LoopOptsDefault) {
+    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
+      IdealLoopTree* lpt = iter.current();
+      if (polynomial_reduction_analyze(C, this, &_igvn, lpt)) {
+        // set_created_loop_node();
+        C->set_major_progress();
+        // poison_rce_post_loop(lpt);
+      }
+    }
+  }
+
   // Perform iteration-splitting on inner loops.  Split iterations to avoid
   // range checks or one-shot null checks.
 
@@ -3240,19 +3255,7 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     // complain about it.
   }
 
-  // wilsj
-  if (C->has_loops() && mode == LoopOptsDefault) {
-    // cl->phi() holds the trip counter
-    // tty->print("In method: ");
-    // C->method()->print_name();
 
-    // tty->print("\n");
-    for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
-      IdealLoopTree* lpt = iter.current();
-      if (polynomial_reduction_analyze(C, this, &_igvn, lpt))
-         C->set_major_progress();
-    }
-  }
 
   // Do verify graph edges in any case
   NOT_PRODUCT( C->verify_graph_edges(); );

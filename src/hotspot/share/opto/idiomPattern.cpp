@@ -14,11 +14,11 @@
 #include "opto/castnode.hpp"
 #include "opto/convertnode.hpp"
 
+
 /****************************************************************
  * Reduce.
  ****************************************************************/
 PatternInstance *ArrayStorePattern::reduce(Node *reduction_phi, Node *iv) {
-  //_access = _access->reduce(reduction_phi, iv);
   _stored_value = _stored_value->reduce(reduction_phi, iv);
 
   if (PatternInstance *p = PrefixSumPattern::make(this))
@@ -27,11 +27,36 @@ PatternInstance *ArrayStorePattern::reduce(Node *reduction_phi, Node *iv) {
   return this;
 }
 
+PatternInstance *ScalarPattern::reduce(Node *reduction_phi, Node *iv) {
+  if (PatternInstance *p = ReductionVariablePattern::make(this, reduction_phi))
+    return p;
+  return this;
+}
+
 PatternInstance *BinOpPattern::reduce(Node *reduction_phi, Node *iv) {
   _lhs = _lhs->reduce(reduction_phi, iv);
   _rhs = _rhs->reduce(reduction_phi, iv);
 
-  if (PatternInstance *p = PrefixBinOpPattern::make(this)) return p;
+  PatternInstance *p;
+  if (p = PrefixBinOpPattern::make(this))
+    return p;
+  if (p = ScaledReductionVariablePattern::make(this))
+    return p;
+  if (p = ReductionPattern::make(this))
+    return p;
+
+  return this;
+}
+
+PatternInstance *IntDemotionPattern::reduce(Node *reduction_phi, Node *iv) {
+  _demoted = _demoted->reduce(reduction_phi, iv);
+  if (_demoted->op() == Reduction &&
+      // NOTE: *ReductionVBNode not implemented.
+      _resulting_type->array_element_basic_type() != T_BYTE) {
+    ReductionPattern *r = static_cast<ReductionPattern*>(_demoted);
+    r->_velt = _resulting_type->array_element_basic_type();
+    return r;
+  }
 
   return this;
 }
@@ -39,7 +64,6 @@ PatternInstance *BinOpPattern::reduce(Node *reduction_phi, Node *iv) {
 /****************************************************************
  * Reduction factories.
  ****************************************************************/
-
 PrefixBinOpPattern *PrefixBinOpPattern::make(BinOpPattern *binop) {
   if (binop->_lhs->op() == ArrayLoad && binop->_rhs->op() == ArrayLoad &&
       binop->_opcode == Op_AddI) {
@@ -67,18 +91,105 @@ PrefixBinOpPattern *PrefixBinOpPattern::make(BinOpPattern *binop) {
     if (!prefix_has_decremented_offset)
       return NULL;
 
-    PrefixBinOpPattern *p = new PrefixBinOpPattern;
-    p->_prefix = prefix;
-    p->_c = c;
-    return p;
+    return new PrefixBinOpPattern(prefix, c);
   }
 
   return NULL;
 }
 
+ReductionVariablePattern *ReductionVariablePattern::make(ScalarPattern *p,
+                                                         Node *reduction_phi) {
+  if (p->_scalar == reduction_phi)
+    return new ReductionVariablePattern(reduction_phi);
+  else return NULL;
+}
+
+PatternInstance *reduction_variable(PatternInstance *p, int binopcode) {
+  if (p->op() == PatternInstance::ScaledReductionVariable &&
+      is_associative(binopcode))
+    return p;
+  else if (p->op() == PatternInstance::ReductionVariable &&
+           is_semiassociative(binopcode))
+    return p;
+  else
+    return NULL;
+}
+
+ReductionPattern *ReductionPattern::make(BinOpPattern *p) {
+  PatternInstance *rv = reduction_variable(p->_lhs, p->_opcode);
+  if (rv == NULL)  rv = reduction_variable(p->_rhs, p->_opcode);
+  if (rv == NULL)  return NULL;
+
+  PatternInstance *c_term = p->_lhs == rv ? p->_rhs : p->_lhs;
+
+  // Longs not supported on AVX2.
+  if (rv->velt() == T_LONG || c_term->velt() == T_LONG) return NULL;
+
+  if (rv->op() == ScaledReductionVariable) {
+    JavaValue n = static_cast<ScaledReductionVariablePattern*>(p->_lhs)->_scale;
+    return new ReductionPattern(p->_opcode, p->_lhs, p->_rhs, n);
+  } else if (rv->op() == ReductionVariable) {
+    return new ReductionPattern(p->_opcode, p->_lhs, p->_rhs);
+  } else {
+    return NULL;
+  }
+}
+
+ReductionPattern *ReductionPattern::make(IntDemotionPattern *p) {
+  if (p->_demoted->op() != p->Reduction) return NULL;
+  return NULL;
+}
+
+ScaledReductionVariablePattern *
+ScaledReductionVariablePattern::make(BinOpPattern *p) {
+  if (p->_lhs->op() == ReductionVariable &&
+      p->_rhs->op() == Scalar) {
+
+    ScalarPattern *con = static_cast<ScalarPattern*>(p->_rhs);
+    switch (p->_opcode) {
+    case Op_LShiftI:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(1 << con->_scalar->get_int()));
+    case Op_LShiftL:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(1 << con->_scalar->get_int()));
+    case Op_MulI:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(con->_scalar->get_int()));
+    case Op_MulL:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(con->_scalar->get_long()));
+    case Op_MulF:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(con->_scalar->getf()));
+    case Op_MulD:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(con->_scalar->getd()));
+    default:
+      return NULL;
+    }
+  } else if (p->_lhs->op() == ScaledReductionVariable &&
+             p->_rhs->op() == ReductionVariable) {
+
+    JavaValue scale = static_cast<ScaledReductionVariablePattern*>(p->_lhs)->_scale;
+    switch (p->_opcode) {
+    case Op_AddI:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(scale.get_jint() + 1));
+    case Op_SubI:
+      return new ScaledReductionVariablePattern(p->_lhs, JavaValue(scale.get_jint() - 1));
+    default:
+      return NULL;
+    }
+  }
+
+  return NULL;
+}
+
+/****************************************************************
+ * Generate.
+ ****************************************************************/
 Node *ArrayLoadPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
-                         Node *reduction_phi, Node *iv) {
-  assert(_access->_offset == NULL, "not implemented");
+                                 Node *reduction_phi, Node *iv,
+                                 Node *loop_entry_ctrl,
+                                 Node_List& pre_old_new,
+                                 IdealLoopTree* lpt) {
+  // TODO: Can be a loop invariant:
+  assert(_access->_offset == NULL || lpt->is_invariant(_access->_offset),
+         "only no or loop invariant offsets accepted");
   BasicType recurr_bt = recurr_t->array_element_basic_type();
 
   LoadNode *load = _access->_load->as_Load();
@@ -109,6 +220,179 @@ Node *ArrayLoadPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, ui
   return NULL;
 }
 
+Node *ScalarPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
+                              Node *reduction_phi, Node *iv,
+                              Node *loop_entry_ctrl,
+                              Node_List& pre_old_new,
+                              IdealLoopTree* lpt) {
+  assert(lpt->is_invariant(_scalar),
+         "only loop invariant scalars allowed");
+  return make_vector(phase, _scalar, recurr_t, vlen);
+}
+
+Node *BinOpPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
+                             Node *reduction_phi, Node *iv,
+                             Node *loop_entry_ctrl,
+                             Node_List& pre_old_new,
+                             IdealLoopTree* lpt) {
+  Node *lhs = _lhs->generate(phase, recurr_t, vlen, reduction_phi, iv, loop_entry_ctrl,
+                             pre_old_new, lpt);
+  Node *rhs = _rhs->generate(phase, recurr_t, vlen, reduction_phi, iv, loop_entry_ctrl,
+                             pre_old_new, lpt);
+
+  Node *result = VectorNode::make(_opcode, lhs, rhs, vlen,
+                                  recurr_t->array_element_basic_type());
+  phase->igvn().register_new_node_with_optimizer(result);
+  return result;
+}
+
+
+Node *LShiftPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
+                              Node *reduction_phi, Node *iv,
+                              Node *loop_entry_ctrl,
+                              Node_List& pre_old_new,
+                              IdealLoopTree* lpt) {
+  assert(_opcode == Op_LShiftI, "sanity");
+  assert(_rhs->result()->is_Con(), "not implemented");
+
+  BasicType recurr_bt = recurr_t->array_element_basic_type();
+  Node *lhs = _lhs->generate(phase, recurr_t, vlen, reduction_phi, iv,
+                             loop_entry_ctrl, pre_old_new, lpt);
+
+  Node *multiplier = phase->igvn().intcon(1 << _rhs->result()->get_int());
+  // TODO: `make_vector` needs control dependency on loop entry
+  // control, without this dependency the vector initialization may
+  // be scheduled before the deciding on vector/scalar loop.
+  Node *result = VectorNode::make(
+      Op_MulI, lhs, make_vector(phase, multiplier, recurr_t, vlen), vlen,
+      recurr_bt);
+  // new MulVINode(lhs, make_vector(phase, multiplier, vlen),
+  // TypeVect::make(recurr_bt, vlen));
+  phase->igvn().register_new_node_with_optimizer(result);
+  return result;
+}
+
+Node *PrefixSumPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
+                                 Node *reduction_phi, Node *iv,
+                                 Node *loop_entry_ctrl,
+                                 Node_List& pre_old_new,
+                                 IdealLoopTree* lpt) {
+  PhaseIterGVN& igvn = phase->igvn();
+
+  Node *store = this->_access->_load;
+  const BasicType recurr_bt = recurr_t->array_element_basic_type();
+  const int ELEM_SZ = type2aelembytes(recurr_bt);
+
+  // Plug in the exit prefix from the pre-loop.
+  Node *pre_prefix = pre_old_new[store->_idx]->in(MemNode::ValueIn);
+  Node *initial_prefix = VectorNode::scalar2vector(pre_prefix, vlen, recurr_t);
+  igvn.register_new_node_with_optimizer(initial_prefix);
+  PhiNode *prefix_phi = PhiNode::make(iv->in(PhiNode::Region), initial_prefix);
+  igvn.register_new_node_with_optimizer(prefix_phi);
+
+  Node *c_load = stored_value()->_c->generate(phase, recurr_t, vlen,
+                                              reduction_phi, iv,
+                                              loop_entry_ctrl,
+                                              pre_old_new,
+                                              lpt);
+  // Hillis and Steele parallel prefix sum performed in vector sized
+  // chunks.
+  Node *last_add = c_load;
+  for (uint i = 1; i < vlen; i *= 2) {
+    Node *shift = new ElemLShiftVNode(last_add, igvn.intcon(ELEM_SZ*i),
+                                      TypeVect::make(recurr_bt, vlen));
+    Node *add = VectorNode::make(Op_AddI, last_add, shift, vlen, recurr_bt);
+    igvn.register_new_node_with_optimizer(shift);
+    igvn.register_new_node_with_optimizer(add);
+    last_add = add;
+  }
+
+  Node *prev_prefix_add = VectorNode::make(Op_AddI, prefix_phi, last_add, vlen, recurr_bt);
+  igvn.register_new_node_with_optimizer(prev_prefix_add);
+
+
+  // NOTE: ExtractI nodes are not currently implemented except for
+  // when used in combination with a ReplicateI node.
+  Node *extract_last = new ExtractINode(prev_prefix_add, igvn.intcon(vlen - 1));
+  igvn.register_new_node_with_optimizer(extract_last);
+  Node *repl_last = new ReplicateINode(extract_last, TypeVect::make(recurr_bt, vlen));
+  igvn.register_new_node_with_optimizer(repl_last);
+  prefix_phi->set_req(2, repl_last);
+
+
+  assert(store->is_Store(), "sanity");
+  StoreVectorNode *storev = StoreVectorNode::make(store->Opcode(),
+                                                  store->in(MemNode::Control),
+                                                  store->in(MemNode::Memory),
+                                                  store->in(MemNode::Address),
+                                                  store->adr_type(), prev_prefix_add, vlen);
+  igvn.register_new_node_with_optimizer(storev);
+  return storev;
+}
+
+Node *ReductionPattern::generate(PhaseIdealLoop *phase,
+                                 const Type *recurr_t, uint vlen,
+                                 Node *reduction_phi, Node *iv,
+                                 Node *loop_entry_ctrl,
+                                 Node_List &pre_old_new,
+                                 IdealLoopTree* lpt) {
+  const BasicType recurr_bt = recurr_t->array_element_basic_type();
+
+  Node *c = _c->generate(phase, recurr_t, vlen, reduction_phi, iv,
+                         loop_entry_ctrl, pre_old_new, lpt);
+
+  Node *identity = phase->igvn().transform(identity_con(_opcode));
+  Node *identities = make_vector(phase, identity, recurr_t, vlen, loop_entry_ctrl);
+  phase->set_ctrl(identities, loop_entry_ctrl);
+
+  Node *initial_acc = new PromoteNode(identities, reduction_phi->in(1),
+                                      TypeVect::make(recurr_bt, vlen));
+  initial_acc->init_req(0, loop_entry_ctrl);
+  phase->register_node(initial_acc, lpt, loop_entry_ctrl, 0);
+  // phase->igvn().register_new_node_with_optimizer(initial_acc);
+
+  Node *m = make_exp_vector(phase, _n, vlen, recurr_t, loop_entry_ctrl);
+  Node *phi = PhiNode::make(iv->in(PhiNode::Region), initial_acc);
+
+  Node *mul0;
+
+  int op_mul = mul_opcode(recurr_bt);
+  int op_add = add_opcode(recurr_bt);
+
+  if (_scaled) {
+    Node *mulv = make_vector(phase, make_pow(_n, vlen, recurr_bt), recurr_t, vlen, loop_entry_ctrl);
+    phase->set_ctrl(mulv, loop_entry_ctrl);
+    mul0 = phase->igvn().transform(VectorNode::make(op_mul, mulv, phi, vlen, recurr_bt));
+  } else {
+    mul0 = phi;
+  }
+
+  Node *mul1;
+  if (_scaled) {
+    mul1 = VectorNode::make(op_mul, c, m, vlen, recurr_bt);
+    phase->igvn().register_new_node_with_optimizer(mul1);
+  } else {
+    mul1 = c;
+  }
+
+  Node *add = VectorNode::make(_opcode, mul0, mul1, vlen, recurr_bt);
+  phi->set_req(2, add);
+
+  phase->register_node(phi, lpt, iv->in(PhiNode::Region), 0);
+
+  phase->igvn().register_new_node_with_optimizer(add);
+
+  int reduce_opcode = reduction_opcode(_opcode);
+  Node *reduce = ReductionNode::make(reduce_opcode, NULL, identity, add, recurr_bt);
+  phase->igvn().register_new_node_with_optimizer(reduce);
+
+  return reduce;
+}
+
+/****************************************************************
+ * Dump.
+ ****************************************************************/
+
 void ArrayLoadPattern::dump(int indent) {
   print_indent(indent);
   tty->print("ARRAYLOAD[N%d", _access->_index->_idx);
@@ -138,282 +422,8 @@ void ArrayStorePattern::dump(int indent) {
 }
 
 /****************************************************************
- * Generate.
+ * Misc.
  ****************************************************************/
-
-Node *ScalarPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
-                              Node *reduction_phi, Node *iv) {
-  return make_vector(phase, _scalar, recurr_t, vlen);
-}
-
-Node *BinOpPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
-                             Node *reduction_phi, Node *iv) {
-  Node *lhs = _lhs->generate(phase, recurr_t, vlen, reduction_phi, iv);
-  Node *rhs = _rhs->generate(phase, recurr_t, vlen, reduction_phi, iv);
-
-  // TODO: Should we use `_bt` or `recurr_t->array_element_basic_type()` here?
-  Node *result = VectorNode::make(_opcode, lhs, rhs, vlen, _bt);
-  phase->igvn().register_new_node_with_optimizer(result);
-  return result;
-}
-
-
-Node *LShiftPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
-                              Node *reduction_phi, Node *iv) {
-  assert(_opcode == Op_LShiftI, "sanity");
-  assert(_rhs->result()->is_Con(), "not implemented");
-
-  BasicType recurr_bt = recurr_t->array_element_basic_type();
-  Node *lhs = _lhs->generate(phase, recurr_t, vlen, reduction_phi, iv);
-
-  Node *multiplier = phase->igvn().intcon(1 << _rhs->result()->get_int());
-  // TODO: `make_vector` needs control dependency on loop entry
-  // control, without this dependency the vector initialization may
-  // be scheduled before the deciding on vector/scalar loop.
-  Node *result = VectorNode::make(
-      Op_MulI, lhs, make_vector(phase, multiplier, recurr_t, vlen), vlen,
-      recurr_bt);
-  // new MulVINode(lhs, make_vector(phase, multiplier, vlen),
-  // TypeVect::make(recurr_bt, vlen));
-  phase->igvn().register_new_node_with_optimizer(result);
-  return result;
-}
-
-Node *PrefixSumPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, uint vlen,
-                                 Node *reduction_phi, Node *iv) {
-  PhaseIterGVN& igvn = phase->igvn();
-
-  const BasicType recurr_bt = recurr_t->array_element_basic_type();
-  const int ELEM_SZ = type2aelembytes(recurr_bt);
-
-  Node *initial_prefix = VectorNode::scalar2vector(NULL, vlen, recurr_t);
-  PhiNode *prefix_phi = PhiNode::make(iv->in(PhiNode::Region), initial_prefix);
-
-  Node *c_load = stored_value()->_c->generate(phase, recurr_t, vlen, reduction_phi, iv);
-  Node *last_add = c_load;
-  // Hillis and Steele parallel prefix sum algorithm:
-  for (uint i = 1; i < vlen; i *= 2) {
-    Node *shift = new ElemLShiftVNode(last_add, igvn.intcon(ELEM_SZ*i),
-                                      TypeVect::make(recurr_bt, vlen));
-    Node *add = VectorNode::make(Op_AddI, last_add, shift, vlen, recurr_bt);
-    igvn.register_new_node_with_optimizer(shift);
-    igvn.register_new_node_with_optimizer(add);
-    last_add = add;
-  }
-
-  Node *prev_prefix_add = VectorNode::make(Op_AddI, prefix_phi, last_add, vlen, recurr_bt);
-  igvn.register_new_node_with_optimizer(prev_prefix_add);
-
-
-  // NOTE: ExtractI nodes are not currently implemented except for
-  // when used in combination with a ReplicateI node.
-  Node *extract_last = new ExtractINode(prev_prefix_add, igvn.intcon(3));
-  igvn.register_new_node_with_optimizer(extract_last);
-  Node *repl_last = new ReplicateINode(extract_last, TypeVect::make(recurr_bt, vlen));
-  igvn.register_new_node_with_optimizer(repl_last);
-  prefix_phi->set_req(2, repl_last);
-
-  Node *store = this->_access->_load;
-  assert(store->is_Store(), "sanity");
-  StoreVectorNode *storev = StoreVectorNode::make(store->Opcode(),
-                                                  store->in(MemNode::Control),
-                                                  store->in(MemNode::Memory),
-                                                  store->in(MemNode::Address),
-                                                  store->adr_type(), prev_prefix_add, vlen);
-  return storev;
-}
-
-
-/****************************************************************
- * Matching.
- ****************************************************************/
-
-ArrayAccessPattern *match_array_access(Node *start, Node *idx,
-                                     NodePred start_predicate,
-                                     bool allow_offset) {
-  ArrayAccessPattern *result = new ArrayAccessPattern();
-
-  ResourceMark rm;
-
-  enum {
-    LOAD_NODE,
-    LOAD_CTRL,
-    ARRAY,
-    MEMORY,
-    IDX_SHIFT_DISTANCE,
-    IDX_OFFSET,
-    ARRAY_BASE_OFFSET,
-    CAST_II,
-
-    N_REFS
-  };
-
-  MatchRefs refs(N_REFS);
-
-
-  Pattern *exact_idx = new ExactNodePattern(idx);
-
-  // FIXME: unnessecary initialization if allow_offset is false.
-  Pattern *idx_offset = new OpcodePattern<3>
-    (Op_AddI,
-     ANY,
-     exact_idx,
-     new CapturePattern(IDX_OFFSET));
-
-  Pattern *idx_pattern = allow_offset
-    ? new OrPattern(idx_offset, exact_idx)
-    : exact_idx;
-
-  Pattern *pre_shift = new OpcodePattern<2> // LShiftL: Left-hand side
-    (Op_ConvI2L,
-     ANY,                          // ConvI2L: Control
-     new OpcodePattern<2> // ConvI2L: Data
-     (Op_CastII,
-      ANY,                         // CastII:  Control
-      idx_pattern,   // CastII:  Index
-      CAST_II));
-
-  Pattern *shift = new OpcodePattern<3>  // AddP: Offset
-    (Op_LShiftL,
-     ANY,                           // LShiftL: Control
-     pre_shift,
-     new OpcodePattern<0>(Op_ConI, IDX_SHIFT_DISTANCE));
-
-  Pattern *p = new Pred2Pattern<3>
-    (start_predicate,
-     new CapturePattern(LOAD_CTRL),
-     new CapturePattern(MEMORY),
-     new OpcodePattern<4>
-     (Op_AddP,
-      ANY,
-      ANY,
-      new OpcodePattern<4>
-      (Op_AddP,
-       ANY,                            // AddP: Control
-       ANY,                            // AddP: Base
-       new PredPattern(is_array_ptr, ARRAY), // AddP: Address
-       new OrPattern(shift, pre_shift)),
-      new OpcodePattern<0>(Op_ConL, ARRAY_BASE_OFFSET)),
-      LOAD_NODE);
-
-
-  // NOTE: If we start at a ConvI2L, skip that node and force _bt to
-  // T_LONG.
-  bool is_long = false;
-  if (start->Opcode() == Op_ConvI2L) {
-    is_long = true;
-    start = start->in(1);
-  }
-
-  if (p->match(start, refs)) {
-    result->_load_ctrl = refs[LOAD_CTRL];
-    result->_load = refs[LOAD_NODE];
-    result->_bt = is_long ? T_LONG : result->_load->bottom_type()->basic_type();
-    result->_index = idx;
-    result->_offset = refs[IDX_OFFSET];
-    result->_result = start;
-    result->_array_ptr = refs[ARRAY];
-    result->_memory = refs[MEMORY];
-    result->_elem_byte_size =
-      1 << (refs[IDX_SHIFT_DISTANCE] != NULL
-            ? refs[IDX_SHIFT_DISTANCE]->get_int()
-            : 0);
-    result->_base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
-
-    assert(result->_load_ctrl->isa_Proj(), "sanity");
-    return result;
-  } else {
-    TRACE(Match, {
-        tty->print_cr("  origin array_read");
-      });
-    return NULL;
-  }
-}
-
-ArrayLoadPattern *match_array_read(Node *start, Node *idx,
-                                   bool allow_offset) {
-  ArrayAccessPattern *p = match_array_access(start, idx, is_primitive_load, allow_offset);
-  if (p == NULL) return NULL;
-  ArrayLoadPattern *lp = new ArrayLoadPattern();
-  lp->_access = p;
-  return lp;
-}
-
-ArrayStorePattern *match_array_store(Node *start, Node *idx,
-                                     bool allow_offset) {
-  ArrayAccessPattern *p = match_array_access(start, idx, is_primitive_store, allow_offset);
-  if (p == NULL) return NULL;
-  PatternInstance *stored_value = match(start->in(MemNode::ValueIn), idx);
-  if (stored_value == NULL) return NULL;
-
-  ArrayStorePattern *sp = new ArrayStorePattern(p, stored_value);
-  return sp;
-}
-
-PatternInstance *match_binop(Node *start, Node *iv) {
-  // Only accept binary operations without control dependence.
-  if (!(is_binop(start) && start->in(0) == NULL)) return NULL;
-
-  Node *lhs = start->in(1);
-  Node *rhs = start->in(2);
-  assert(lhs != NULL && rhs != NULL, "sanity");
-
-  PatternInstance *lhs_p = match(lhs, iv);
-  if (lhs_p == NULL) return NULL;
-  PatternInstance *rhs_p = match(rhs, iv);
-  if (rhs_p == NULL) return NULL;
-
-  BinOpPattern *pi = start->Opcode() != Op_LShiftI
-    ? new BinOpPattern()
-    : new LShiftPattern();
-  pi->_opcode = start->Opcode();
-  pi->_lhs = lhs_p;
-  pi->_rhs = rhs_p;
-  pi->_bt = start->bottom_type()->array_element_basic_type();
-
-  return pi;
-}
-
-PatternInstance *match_scalar(Node *start) {
-  // NOTE: Assumes the scalar to be loop invariant. Presence of loop
-  // variant scalars should exit idiom vectorization early. To account
-  // for this, we currently only accept scalar constants.
-  if (start->Opcode() == Op_ConI || start->Opcode() == Op_ConF ||
-      start->Opcode() == Op_ConD) {
-    ScalarPattern *p = new ScalarPattern();
-    p->_scalar = start;
-    return p;
-  } else if (start->Opcode() == Op_Phi) {
-    ScalarPattern *p = new ScalarPattern();
-    p->_scalar = start;
-    return p;
-  } else {
-    return NULL;
-  }
-}
-
-// Start is reduction phi->in(2).
-PatternInstance *match_prefix_sum(Node *start, Node *iv) {
-  PatternInstance *store = match_array_store(start, iv, true);
-
-  return NULL;
-}
-
-PatternInstance *match(Node *start, Node *iv) {
-  PatternInstance *pi;
-  if (pi = match_array_read(start, iv, true))
-    return pi;
-  if (pi = match_array_store(start, iv))
-    return pi;
-  if (pi = match_binop(start, iv))
-    return pi;
-  if (pi = match_scalar(start))
-    return pi;
-
-  TRACE(Match, {
-      tty->print_cr("Unable to find pattern instance.");
-      tty->print("  "); start->dump(" start node");
-    });
-
-  return NULL;
+BasicType BinOpPattern::velt() {
+  return this->_origin->bottom_type()->array_element_basic_type();
 }

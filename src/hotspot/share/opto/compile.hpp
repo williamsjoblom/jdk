@@ -242,7 +242,9 @@ class Compile : public Phase {
 
  private:
   // Fixed parameters to this compilation.
+public:
   const int             _compile_id;
+private:
   const bool            _save_argument_registers; // save/restore arg regs for trampolines
   const bool            _subsume_loads;         // Load can be matched as part of a larger op.
   const bool            _do_escape_analysis;    // Do escape analysis.

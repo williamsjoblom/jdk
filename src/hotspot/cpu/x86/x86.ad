@@ -3278,14 +3278,14 @@ instruct loadUBV(vec dst, memory mem) %{
     int vlen = vector_length(this);
     if (elem_bt == T_SHORT) {
       switch (vlen) { // TODO: change to vector_length_in_bytes()
-        case 8: __ pmovzxbw($dst$$XMMRegister, $mem$$Address); break;
-        case 16: assert(false, "not implemented"); break;
+        case 8: __ vpmovzxbw($dst$$XMMRegister, $mem$$Address, Assembler::AVX_128bit); break;
+        case 16: __ vpmovzxbw($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
         case 32: assert(false, "not implemented"); break;
         default: ShouldNotReachHere();
       }
     } else if (elem_bt == T_INT) {
       switch (vlen) { // TODO: change to vector_length_in_bytes()
-        case 4: __ pmovzxbd($dst$$XMMRegister, $mem$$Address); break;
+        case 4: __ vpmovzxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_128bit); break;
         case 8: __ vpmovzxbd($dst$$XMMRegister, $mem$$Address, Assembler::AVX_256bit); break;
         case 16: assert(false, "not implemented"); break;
         default: ShouldNotReachHere();
@@ -3450,6 +3450,7 @@ instruct ConV16_imm(vec dst, immL lo, immL hi) %{
     uint vlen = vector_length(this);
     InternalAddress lo_addr = $constantaddress($hi$$constant, $lo$$constant);
     // Aligned load. Asserts that lo_addr is aligned.
+    __ nop();
     __ movdqa($dst$$XMMRegister, lo_addr);
   %}
   ins_pipe( pipe_slow );
