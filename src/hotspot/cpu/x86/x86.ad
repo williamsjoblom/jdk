@@ -3450,7 +3450,6 @@ instruct ConV16_imm(vec dst, immL lo, immL hi) %{
     uint vlen = vector_length(this);
     InternalAddress lo_addr = $constantaddress($hi$$constant, $lo$$constant);
     // Aligned load. Asserts that lo_addr is aligned.
-    __ nop();
     __ movdqa($dst$$XMMRegister, lo_addr);
   %}
   ins_pipe( pipe_slow );
@@ -3463,8 +3462,8 @@ instruct ElemLShiftV_imm(vec dst, vec src, immU8 dist) %{
     int vlen_enc = vector_length_encoding(this);
     switch (vector_length_in_bytes(this, $src)) {
     case 16:
-      __ movdqa($dst$$XMMRegister, $src$$XMMRegister);
-      __ pslldq($dst$$XMMRegister, $dist$$constant);
+      // __ movdqa($dst$$XMMRegister, $src$$XMMRegister);
+      __ vpslldq($dst$$XMMRegister, $src$$XMMRegister, $dist$$constant, vlen_enc);
       break;
     case 32:
       // Added complexity since we shift across the 128-bit interlane

@@ -286,9 +286,12 @@ Node *PrefixSumPattern::generate(PhaseIdealLoop *phase, const Type *recurr_t, ui
   // Plug in the exit prefix from the pre-loop.
   Node *pre_prefix = pre_old_new[store->_idx]->in(MemNode::ValueIn);
   Node *initial_prefix = VectorNode::scalar2vector(pre_prefix, vlen, recurr_t);
-  igvn.register_new_node_with_optimizer(initial_prefix);
+  initial_prefix->init_req(0, loop_entry_ctrl);
+  phase->register_node(initial_prefix, lpt, loop_entry_ctrl, 0);
+
   PhiNode *prefix_phi = PhiNode::make(iv->in(PhiNode::Region), initial_prefix);
-  igvn.register_new_node_with_optimizer(prefix_phi);
+  phase->register_node(prefix_phi, lpt, iv->in(PhiNode::Region), 0);
+  // igvn.register_new_node_with_optimizer(prefix_phi);
 
   Node *c_load = stored_value()->_c->generate(phase, recurr_t, vlen,
                                               reduction_phi, iv,

@@ -3240,6 +3240,7 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
     }
   }
 
+
   // Perform iteration-splitting on inner loops.  Split iterations to avoid
   // range checks or one-shot null checks.
 

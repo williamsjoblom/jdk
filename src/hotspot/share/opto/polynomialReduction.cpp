@@ -23,7 +23,7 @@
  ***************************************************************/
 struct PatternInstance;
 
-const int TRACE_OPTS = //MinCond | // Match | MinCond
+const int TRACE_OPTS = MinCond | // Match | MinCond
   NoTraceOpts;
 
 /****************************************************************
@@ -101,7 +101,8 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory) {
 
 // Do a depth first search following outgoing edges until a member of
 // `nodes` is found. This node is then returned.
-// Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List &visited, uint depth=0) {
+// Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List
+// &visited, uint depth=0) {
 //   if (depth >= MAX_SEARCH_DEPTH || visited.member(start)) return NULL;
 //   if (nodes.contains(start)) return start;
 
@@ -353,9 +354,9 @@ Node *pre_loop_align_limit(PhaseIterGVN &igvn, Node *target_align,
 
 void align_first_main_loop_iters(PhaseIterGVN &igvn, CountedLoopNode *pre_loop, Node *orig_limit,
                                  AlignInfo *align, int vlen) {
-  tty->print_cr("Aligning main loop: N%d + %d, preferred align: %d bits",
-                align->_base_ptr->_idx, align->_base_offset,
-                align->_preferred_align * 8);
+  // tty->print_cr("Aligning main loop: N%d + %d, preferred align: %d bits",
+  //               align->_base_ptr->_idx, align->_base_offset,
+  //               align->_preferred_align * 8);
   Node *base = align->_base_ptr;
   Node *base_offset = igvn.longcon(align->_base_offset);
   Node *first_elem_ptr = igvn.transform(new AddPNode(base, base, base_offset));
@@ -833,7 +834,7 @@ int min_profitable_trips(int vlen, BasicType bt,
 
 // Clone the loop to be vectorized, where the cloned, unvectorized,
 // loop is picked for low tripcounts.
-void build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
+Node *build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
                           CountedLoopNode *cl, BasicType bt, int vlen,
                           PatternInstance *pi, int max_pre_iters=1) {
   //cl->mark_is_multiversioned();
@@ -845,11 +846,11 @@ void build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
   // Projection node for the vectorized loop.
   ProjNode *proj_true = phase->create_slow_version_of_loop(
     lpt, old_new, Op_If,
-    PhaseIdealLoop::ControlAroundStripMined);
+    PhaseIdealLoop::CloneIncludesStripMined);
 
   CountedLoopNode *slow_cl = old_new[cl->_idx]->as_CountedLoop();
   slow_cl->mark_passed_idiom_analysis();
-  tty->print_cr("     Slow CL idx: %d", slow_cl->_idx);
+  // tty->print_cr("     Slow CL idx: %d", slow_cl->_idx);
 
   const int scalar_limit = min_profitable_trips(vlen, bt, pi, max_pre_iters);
 
@@ -861,11 +862,11 @@ void build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
   // Take the vectorized loop if cl->limit() >= scalar_limit.
   CmpINode *cmp = new CmpINode(cl->limit(), phase->igvn().intcon(scalar_limit));
   phase->igvn().register_new_node_with_optimizer(cmp);
-  BoolNode *ge = new BoolNode(cmp, BoolTest::ge);
-  phase->igvn().register_new_node_with_optimizer(ge);
+  BoolNode *gt = new BoolNode(cmp, BoolTest::gt);
+  phase->igvn().register_new_node_with_optimizer(gt);
 
   IfNode *iff = proj_true->in(0)->as_If();
-  phase->igvn().replace_input_of(iff, 1, ge);
+  phase->igvn().replace_input_of(iff, 1, gt);
 
   TRACE(Rewrite, {
       tty->print_cr("End loop variants");
@@ -877,6 +878,8 @@ void build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
     Node *n_clone = old_new[n->_idx];
     phase->igvn()._worklist.push(n_clone);
   }
+
+  return proj_true;
 }
 
 struct LoopVariantInfo {
@@ -942,9 +945,10 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   assert(is_power_of_2(VLEN), "santiy");
   phase->C->set_max_vector_size(SuperWordPolynomialWidth); // FIXME: Make shared for different patterns.
 
-  LoopVariantInfo aggressive;
+  Node *loop_entry_ctrl = cl->in(LoopNode::EntryControl);
+  //LoopVariantInfo aggressive;
   if (SuperWordPolynomialMultiversion) {
-    build_scalar_variant(phase, lpt, cl, recurr_bt, VLEN, pi, pre_iters);
+    loop_entry_ctrl = build_scalar_variant(phase, lpt, cl, recurr_bt, VLEN, pi, pre_iters);
   }
 
 
@@ -964,18 +968,32 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
     }
   }
 
-  Node *loop_entry_ctrl = cl->skip_strip_mined()->in(LoopNode::EntryControl);
+
   Node *start_replace = pi->generate(phase, recurr_t, VLEN, reduction_phi,
                                      induction_phi, loop_entry_ctrl, old_new,
                                      lpt);
 
   // start_replace->set_req(0, cl->loopexit()->proj_out(false));
   assert(start_replace != NULL, "no ir generated");
-  //igvn.register_new_node_with_optimizer(start_replace);
-  igvn.replace_node(start, start_replace);
-  //phase->set_ctrl(start_replace, cl->loopexit()->proj_out(false));
+  // for (DUIterator_Fast imax, i = reduction_phi->fast_outs(imax); i < imax; i++) {
+  //   Node *out = reduction_phi->fast_out(i);
+  //   igvn.rehash_node_delayed(out);
+  //   out->set_in(2, start_replace);
+  // }
 
-  // igvn.remove_dead_node(start);
+  // igvn.rehash_node_delayed(reduction_phi);
+  // reduction_phi->set_req(2, reduction_phi->in(1));
+  // phase->recompute_dom_depth();
+
+  // igvn.replace_node(reduction_phi, start_replace);
+
+  igvn.replace_node(start, start_replace);
+
+  lpt->record_for_igvn();
+  // igvn.replace_node(reduction_phi, start_replace);
+
+  //phase->set_ctrl(start_replace, cl->loopexit()->proj_out(false));
+  //igvn.remove_dead_node(start);
 
   // if (pi->op() == PatternInstance::Reduction) {
   //   // NOTE: Ugly, possibly very unsafe hack, removing the need to
@@ -1183,6 +1201,8 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
      mul0 = phi;
   }
 
+
+
   Node *mul1;
   if (n_factor_info != IDENTITY) {
     mul1 = VectorNode::make(op_mul, c_term, m, VLEN, recurr_bt);
@@ -1246,7 +1266,7 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
                     C->method()->get_Method()->name()->as_utf8());
     });
 
-  phase->ltree_root()->dump();
+  // phase->ltree_root()->dump();
   bool ok = build_stuff(C, lpt, phase, igvn, cl);
   cl->mark_was_idiom_analyzed();
   if (ok) {

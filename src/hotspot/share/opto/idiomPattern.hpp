@@ -123,7 +123,9 @@ struct ArrayAccessPattern : PatternInstance {
   virtual AlignInfo *align_info(int vlen) {
     int base_offset = arrayOopDesc::base_offset_in_bytes(velt());
     int bytes_per_iter = type2aelembytes(velt());
-    int preferred_align = vlen * bytes_per_iter;
+    // NOTE: Ryzen specific, 256 bit loads need only be aligned to 16
+    // bit congruent addresses.
+    int preferred_align = MIN2(vlen * bytes_per_iter, 16);
     return new AlignInfo(_array_ptr, base_offset,
                          preferred_align,
                          bytes_per_iter);
