@@ -114,16 +114,16 @@ ArrayAccessPattern *match_array_access(Node *start, Node *idx,
 
   Pattern *pre_shift = new OpcodePattern<2> // LShiftL: Left-hand side
     (Op_ConvI2L,
-     ANY,                          // ConvI2L: Control
-     new OpcodePattern<2> // ConvI2L: Data
+     ANY,                                   // ConvI2L: Control
+     new OpcodePattern<2>                   // ConvI2L: Data
      (Op_CastII,
-      ANY,                         // CastII:  Control
-      idx_pattern,   // CastII:  Index
+      ANY,                                  // CastII:  Control
+      idx_pattern,                          // CastII:  Index
       CAST_II));
 
-  Pattern *shift = new OpcodePattern<3>  // AddP: Offset
+  Pattern *shift = new OpcodePattern<3>     // AddP: Offset
     (Op_LShiftL,
-     ANY,                           // LShiftL: Control
+     ANY,                                   // LShiftL: Control
      pre_shift,
      new OpcodePattern<0>(Op_ConI, IDX_SHIFT_DISTANCE));
 
@@ -168,7 +168,6 @@ ArrayAccessPattern *match_array_access(Node *start, Node *idx,
             : 0);
     result->_base_offset = refs[ARRAY_BASE_OFFSET]->get_long();
 
-    //assert(result->_load_ctrl->isa_Proj(), "sanity");
     return result;
   } else {
     TRACE(Match, {

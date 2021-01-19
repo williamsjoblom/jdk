@@ -23,40 +23,16 @@
  ***************************************************************/
 struct PatternInstance;
 
-const int TRACE_OPTS = MinCond | // Match | MinCond
-  NoTraceOpts;
-
-/****************************************************************
- * Map dense Node indices to PatternInstances.
- ****************************************************************/
-class Node2Instance : public ResourceObj {
-  GrowableArray<PatternInstance *> map;
-
-  void annotate(const Node *node, PatternInstance *with_pattern) {
-    map.at_put_grow(node->_idx, with_pattern);
-  }
-
-  PatternInstance *at(const Node *node) {
-    assert(map.length() > 0, "");
-    if ((uint32_t) map.length() <= node->_idx) return NULL;
-    assert(node->_idx <= INT32_MAX, "");
-    return map.at(node->_idx);
-  }
-};
-
-/****************************************************************
- * Tracing.
- ****************************************************************/
-
+const int TRACE_OPTS = NoTraceOpts;
 
 /****************************************************************
  * Minimum matching condition.
  ****************************************************************/
-bool has_control_flow(CountedLoopNode *cl) {
-  // TODO: Bad negation?
-  Node *exit = cl->loopexit();
-  return exit->in(0) == cl;
-}
+// bool has_control_flow(CountedLoopNode *cl) {
+//   // TODO: Bad negation?
+//   Node *exit = cl->loopexit();
+//   return exit->in(0) == cl;
+// }
 
 PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory) {
   // Find _the_ phi node connected with a control edge from the given
@@ -75,9 +51,7 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory) {
     bool primitive_reduction = !memory &&
       is_java_primitive(n->bottom_type()->basic_type());
 
-    if (n->is_Phi() && n != induction_phi //&&
-        // (primitive_reduction || memory_reduction)
-        ) {
+    if (n->is_Phi() && n != induction_phi) {
       // Only allow loops with one cross-iteration dependecy for now:
       if (recurrence_phi != NULL) {
         TRACE(MinCond, {
@@ -96,47 +70,13 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory) {
   return recurrence_phi != NULL ? recurrence_phi->as_Phi() : NULL;
 }
 
-// DFS following DU-edges searching for a member of `nodes`. Depth
-// limited by `MAX_SEARCH_DEPTH`.
-
-// Do a depth first search following outgoing edges until a member of
-// `nodes` is found. This node is then returned.
-// Node *find_nodes(Node *start, Node_List &nodes, Unique_Node_List
-// &visited, uint depth=0) {
-//   if (depth >= MAX_SEARCH_DEPTH || visited.member(start)) return NULL;
-//   if (nodes.contains(start)) return start;
-
-//   visited.push(start);
-
-//   for (DUIterator it = start->outs(); start->has_out(it); it++) {
-//     Node *n = start->out(it);
-//     Node *result = find_nodes(n, nodes, visited, depth + 1);
-//     if (result != NULL) return result;
-//   }
-
-//   return NULL;
-// }
 
 // TODO: most likely too slow to be run on EVERY CountedLoop. We
 // should probably replace the DFS in `find_nodes` with a BFS, reduce
 // `MAX_SEARCH_DEPTH`, or come up with a new solution all together.
 Node *find_rhs(PhiNode *reduction_phi) {
   return reduction_phi->in(2);
-
-  // Node_List inputs;
-  // for (uint i = PhiNode::Input; i < reduction_phi->len(); i++) {
-  //   inputs.push(reduction_phi->in(i));
-  // }
-
-  // Unique_Node_List visited;
-  // Node *bottom = find_nodes(reduction_phi, inputs, visited);
-
-  // return bottom;
 }
-
-/****************************************************************
- * Match references.
- ****************************************************************/
 
 /****************************************************************
  * Pattern matching.
@@ -219,7 +159,7 @@ NFactorInfo match_shift_con_mul(Node *start, Node *of, JavaValue &result) {
     }
 
     result = JavaValue(multiplier);
-    return NOT_IDENTITY; //ConNode::make(TypeInt::make(multiplier));
+    return NOT_IDENTITY;
   } else {
     TRACE(Match, {
         tty->print_cr("  origin shift_con_mul");
@@ -344,19 +284,13 @@ Node *pre_loop_align_limit(PhaseIterGVN &igvn, Node *target_align,
   // ptr_first_elem % target_align (assumes `target_align` to be power of 2).
   Node *target_minus1 = igvn.transform(new AddINode(target_align, igvn.intcon(-1)));
   Node *mod = igvn.transform(new AndINode(ptr_first_elem, target_minus1));
-
-  // target_align - ptr_first_elem%target_align
   Node *sub = igvn.transform(new SubINode(target_align, mod));
-  // (target_align - ptr_first_elem%target_align) / elem_size
   Node *div = igvn.transform(new URShiftINode(sub, igvn.intcon(log2_int(elem_size))));
   return div;
 }
 
 void align_first_main_loop_iters(PhaseIterGVN &igvn, CountedLoopNode *pre_loop, Node *orig_limit,
                                  AlignInfo *align, int vlen) {
-  // tty->print_cr("Aligning main loop: N%d + %d, preferred align: %d bits",
-  //               align->_base_ptr->_idx, align->_base_offset,
-  //               align->_preferred_align * 8);
   Node *base = align->_base_ptr;
   Node *base_offset = igvn.longcon(align->_base_offset);
   Node *first_elem_ptr = igvn.transform(new AddPNode(base, base, base_offset));
@@ -368,7 +302,6 @@ void align_first_main_loop_iters(PhaseIterGVN &igvn, CountedLoopNode *pre_loop, 
   x_elem_ptr = new ConvL2INode(x_elem_ptr);
   igvn.register_new_node_with_optimizer(x_elem_ptr);
 #endif
-  // uint target_align = type2aelembytes(align._elem_bt)*vlen;
   Node *target_align_con = igvn.intcon(align->_preferred_align);
 
   Node *new_limit = pre_loop_align_limit(igvn, target_align_con, x_elem_ptr,
@@ -619,12 +552,6 @@ jlong make_exp_vector_part(int i, JavaValue n, int elem_bytes, BasicType bt) {
 // Make vector containing [n^{vlen}, n^{vlen-1}, ..., n^1, n^0].
 Node *make_exp_vector(PhaseIdealLoop *phase, JavaValue n, juint vlen, const Type *t,
                       Node *control) {
-  // if (0 <= n && n <= 1) {
-  //   // [0^3, 0^2, 0^1, 0^0] = [0, 0, 0, 0] and
-  //   // [1^3, 1^2, 1^1, 1^0] = [1, 1, 1, 1]
-  //   return make_vector(phase, n, t, vlen);
-  // }
-
   BasicType bt = t->array_element_basic_type();
   int elem_bytes = type2aelembytes(bt);
   int elem_bits = elem_bytes*8;
@@ -640,12 +567,6 @@ Node *make_exp_vector(PhaseIdealLoop *phase, JavaValue n, juint vlen, const Type
   if (vector_bytes == 16) {
     Node *a = igvn.transform(ConNode::make(TypeLong::make(make_exp_vector_part(0, n, elem_bytes, bt))));
     Node *b = igvn.transform(ConNode::make(TypeLong::make(make_exp_vector_part(1, n, elem_bytes, bt))));
-
-    // tty->print_cr("Make 16 byte exponential vector: a-lo: 0x%x a-hi: 0x%x b-lo: 0x%x b-hi: 0x%x",
-    //               static_cast<uint32_t>(a->get_long() & UINT32_MAX),
-    //               static_cast<uint32_t>(static_cast<uint64_t>(a->get_long()) >> 32),
-    //               static_cast<uint32_t>(b->get_long() & UINT32_MAX),
-    //               static_cast<uint32_t>(static_cast<uint64_t>(b->get_long()) >> 32));
 
     Node *con = VectorNode::scalars2vector(a, b, bt);
     if (control) con->set_req(0, control);
@@ -752,43 +673,6 @@ void adjust_limit(CountedLoopNode *cl, PhaseIterGVN &igvn, Node *adjusted_limit)
   igvn.replace_input_of(cmp, LIMIT, adjusted_limit);
 }
 
-// TODO: move to Matcher::
-bool check_cpu_features(uint vbytes, BasicType recurr_bt) {
-  bool r = true;
-
-  switch (vbytes) {
-  case 16: r &= VM_Version::supports_sse4_2(); break;
-  case 32: r &= VM_Version::supports_avx2(); break;
-  case 64: r &= VM_Version::supports_evex(); break;
-  default: return false;
-  }
-
-  switch (recurr_bt) {
-  case T_BYTE:
-  case T_SHORT:
-    r &= (vbytes == 64) ? VM_Version::supports_avx512bw() : true;
-    break;
-  case T_INT:
-    break;
-  case T_LONG:
-    r &= VM_Version::supports_avx512vldq();
-    break;
-  default:
-    return false;
-  }
-
-  return r;
-}
-
-int prologue_cost() {
-  // TODO
-  return 0;
-}
-
-float epilogue_cost(int vlen, BasicType bt) {
-  // TODO:
-  return 0;
-}
 
 int round_up(int number, int multiple) {
   int remainder = number % multiple;
@@ -815,7 +699,6 @@ int min_profitable_trips(int vlen, BasicType bt,
         return (vlen == 4 ? 12 : 24) + max_pre_iters;
       case T_INT:
         return (vlen == 4 ? 40 : 80) + max_pre_iters;
-      // case T_SHORT: return (vlen == 8 ? )
       default: break;
       }
     } else {
@@ -837,7 +720,6 @@ int min_profitable_trips(int vlen, BasicType bt,
 Node *build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
                           CountedLoopNode *cl, BasicType bt, int vlen,
                           PatternInstance *pi, int max_pre_iters=1) {
-  //cl->mark_is_multiversioned();
   TRACE(Rewrite, {
       tty->print_cr("Start loop variants");
     });
@@ -850,8 +732,6 @@ Node *build_scalar_variant(PhaseIdealLoop *phase, IdealLoopTree *lpt,
 
   CountedLoopNode *slow_cl = old_new[cl->_idx]->as_CountedLoop();
   slow_cl->mark_passed_idiom_analysis();
-  // tty->print_cr("     Slow CL idx: %d", slow_cl->_idx);
-
   const int scalar_limit = min_profitable_trips(vlen, bt, pi, max_pre_iters);
 
   // Limit the profile trip count on the slow loop to account for the
@@ -933,24 +813,19 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   const int VLEN = SuperWordPolynomialWidth / type2aelembytes(recurr_bt);
 
   // Skip vectorization when trip-count is expected to be below profitability.
-  int pre_iters = SuperWordPolynomialAlign ? VLEN : 1;
+  int pre_iters = VLEN;
   lpt->compute_profile_trip_cnt(phase);
   if (round(cl->profile_trip_cnt()) < min_profitable_trips(VLEN, recurr_bt, pi, pre_iters)) {
-    tty->print_cr("PTC bailout (actual %f, target %d pres %d)",
-                  round(cl->profile_trip_cnt()),
-                  min_profitable_trips(VLEN, recurr_bt, pi, pre_iters),
-                  pre_iters);
     return false;
   }
   assert(is_power_of_2(VLEN), "santiy");
-  phase->C->set_max_vector_size(SuperWordPolynomialWidth); // FIXME: Make shared for different patterns.
+  phase->C->set_max_vector_size(SuperWordPolynomialWidth);
 
+  // Apply scalar multiversioning.
   Node *loop_entry_ctrl = cl->in(LoopNode::EntryControl);
-  //LoopVariantInfo aggressive;
   if (SuperWordPolynomialMultiversion) {
     loop_entry_ctrl = build_scalar_variant(phase, lpt, cl, recurr_bt, VLEN, pi, pre_iters);
   }
-
 
   Node_List old_new;
   Node *orig_limit = cl->limit();
@@ -959,50 +834,21 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   set_stride(cl, phase, VLEN);
   adjust_limit(cl, phase->igvn(), new_limit);
 
-  if (SuperWordPolynomialAlign) {
-    AlignInfo *align_info = pi->align_info(VLEN);
-
-    if (align_info != NULL) {
-      align_first_main_loop_iters(igvn, find_pre_loop(cl), orig_limit,
-                                  align_info, VLEN);
-    }
+  // Align vector loop iteration.
+  AlignInfo *align_info = pi->align_info(VLEN);
+  if (align_info != NULL) {
+    align_first_main_loop_iters(igvn, find_pre_loop(cl), orig_limit,
+                                align_info, VLEN);
   }
-
 
   Node *start_replace = pi->generate(phase, recurr_t, VLEN, reduction_phi,
                                      induction_phi, loop_entry_ctrl, old_new,
                                      lpt);
-
-  // start_replace->set_req(0, cl->loopexit()->proj_out(false));
   assert(start_replace != NULL, "no ir generated");
-  // for (DUIterator_Fast imax, i = reduction_phi->fast_outs(imax); i < imax; i++) {
-  //   Node *out = reduction_phi->fast_out(i);
-  //   igvn.rehash_node_delayed(out);
-  //   out->set_in(2, start_replace);
-  // }
-
-  // igvn.rehash_node_delayed(reduction_phi);
-  // reduction_phi->set_req(2, reduction_phi->in(1));
-  // phase->recompute_dom_depth();
-
-  // igvn.replace_node(reduction_phi, start_replace);
 
   igvn.replace_node(start, start_replace);
 
   lpt->record_for_igvn();
-  // igvn.replace_node(reduction_phi, start_replace);
-
-  //phase->set_ctrl(start_replace, cl->loopexit()->proj_out(false));
-  //igvn.remove_dead_node(start);
-
-  // if (pi->op() == PatternInstance::Reduction) {
-  //   // NOTE: Ugly, possibly very unsafe hack, removing the need to
-  //   // perform a horizontal vector reduction every iteration.
-  //   if (Node *sp = start_replace->find_out_with(Op_SafePoint)) {
-  //     sp->replace_edge(start_replace, old_new[start->_idx]);
-  //     sp->replace_edge(orig_incr, old_new[orig_incr->_idx]);
-  //   }
-  // }
 
   static int total_vectorized_loops = 0;
   Compile *c = igvn.C;
@@ -1037,7 +883,6 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
 bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
                  PhaseIterGVN *igvn, CountedLoopNode *cl) {
   const juint VBYTES = SuperWordPolynomialWidth;
-  const bool GO_PREFIX_SUM = true;
   /**************************************************************
    * Find induction and reduction phis, and right hand side of
    * scalar reduction.
@@ -1048,185 +893,14 @@ bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
       tty->print_cr("Found induction phi N%d", induction_phi->_idx);
     });
 
-
   // PhiNode holding the current value of the recurrence variable.
-  PhiNode *reduction_phi = find_recurrence_phi(cl, GO_PREFIX_SUM);
+  PhiNode *reduction_phi = find_recurrence_phi(cl, true);
   if (reduction_phi == NULL) return false;
   TRACE(MinCond, {
     tty->print_cr("Found reduction phi N%d", reduction_phi->_idx);
   });
 
-  if (GO_PREFIX_SUM) {
-    return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
-  }
-
-  // Right hand side of the assignment.
-  Node *rhs = find_rhs(reduction_phi); //find_rhs(acc_add, reduction_phi);
-  if (rhs == NULL || rhs->req() < 2) return false;
-  TRACE(MinCond, {
-      tty->print_cr("Found right-hand-side N%d", rhs->_idx);
-    });
-
-  PatternInstance *_pi = match(rhs, induction_phi); //->dump();
-  tty->print_cr("Before reduce");
-  _pi->dump();
-  tty->print_cr("After reduce");
-  _pi = _pi->reduce(reduction_phi, induction_phi);
-  _pi->dump();
-
-  /**************************************************************
-   * Strip away any integer downcasts and determine type of
-   * the sub-reductions.
-   **************************************************************/
-  BasicType recurr_bt;
-  Node *start = strip_conversions(rhs, recurr_bt);
-  if (start == NULL) return false;
-  const Type *recurr_t = Type::get_const_basic_type(recurr_bt);
-
-  if (!is_associative(start->Opcode())) {
-    TRACE(MinCond, {
-        tty->print_cr("Reduction operator %s non associative", start->Name());
-      });
-    return false;
-  }
-
-  /**************************************************************
-   * Find the constant factor `N`.
-   **************************************************************/
-  JavaValue n_factor;
-  NFactorInfo n_factor_info = find_n_factor(start->in(1), reduction_phi, recurr_bt, n_factor);
-  if (n_factor_info == NOT_FOUND) {
-    TRACE(Match, {
-        tty->print_cr("Unable to find N");
-        tty->print("  "); rhs->dump(" right hand side\n");
-      });
-
-    return false;
-  }
-
-  /**************************************************************
-   * Build pattern instance tree.
-   **************************************************************/
-  const juint VLEN = VBYTES / type2aelembytes(recurr_bt);
-
-  AlignInfo* align;
-  bool attempt_align = false;
-
-  {
-    ResourceMark rm;
-
-    PatternInstance *pi = match(start->in(2), induction_phi);
-    if (pi == NULL)
-      return false;
-    // if (pi->has_alignable_load()) {
-    //   attempt_align = true;
-    //   align._base_addr = pi->base_addr();
-    //   align._elem_bt = pi->elem_bt();
-    // }
-  }
-
-  /**************************************************************
-   * Vectorize IR (point of no return).
-   **************************************************************/
-  // if (SuperWordPolynomialMultiversion) {
-  //   build_scalar_variant(phase, lpt, cl, VLEN);
-  // }
-
-  // FIXME: To avoid nesting of resource marks when calling
-  // `build_loop_variants` we redo the matching, avoiding
-  // GrowableArray growth within nested resource marks. Maybe look
-  // over the allocation strategy used for PatternInstances?
-  Node *c_term;
-  {
-    ResourceMark rm;
-    PatternInstance *pi = match(start->in(2), induction_phi);
-    assert(pi != NULL, "");
-    Node_List _;
-    c_term = pi->generate(phase, recurr_t, VLEN, reduction_phi, induction_phi, NULL, _,
-                          lpt);
-  }
-
-  // Split loop.
-  Node_List old_new;
-  Node *orig_limit = cl->limit();
-  Node *new_limit = split_loop(lpt, phase, cl, VLEN, old_new);
-  set_stride(cl, phase, VLEN);
-  adjust_limit(cl, phase->igvn(), new_limit);
-
-  if (C->max_vector_size() < VBYTES) {
-    C->set_max_vector_size(VBYTES);
-  }
-
-  // Align first iteration.
-  CountedLoopNode *pre_loop = find_pre_loop(cl);
-  if (SuperWordPolynomialAlign && attempt_align) {
-    align_first_main_loop_iters(phase->igvn(), pre_loop,
-                                orig_limit, align, VLEN);
-  }
-
-  int op_reduce = start->Opcode();
-
-  Node *loop_entry_ctrl = cl->skip_strip_mined()->in(LoopNode::EntryControl);
-
-  Node *identity = phase->igvn().transform(identity_con(op_reduce));
-  Node *identities = make_vector(phase, identity, recurr_t, VLEN, loop_entry_ctrl);
-
-  Node *initial_acc = new PromoteNode(identities, reduction_phi->in(1),
-                                      TypeVect::make(recurr_bt, VLEN));
-  phase->igvn().register_new_node_with_optimizer(initial_acc);
-  // phase->set_ctrl(initial_acc, loop_entry_ctrl);
-
-  Node *m = make_exp_vector(phase, n_factor, VLEN, recurr_t, loop_entry_ctrl);
-  Node *phi = PhiNode::make(induction_phi->in(PhiNode::Region), initial_acc);
-  phase->igvn().register_new_node_with_optimizer(phi);
-
-  // TODO: Investigate performance if replaced with vector x scalar
-  // multiplication (`mulv` is a vector of scalar duplicates), it
-  // should peel off a few instructions from the main loop prologue.
-  Node *mul0;
-
-  int op_mul = mul_opcode(recurr_bt);
-  int op_add = add_opcode(recurr_bt);
-
-
-  // If we do not multiply our recurrence variable, don't create an
-  // multiplication.
-  if (n_factor_info != IDENTITY) {
-    Node *mulv = make_vector(phase, make_pow(n_factor, VLEN, recurr_bt), recurr_t, VLEN, loop_entry_ctrl);
-    //mulv->ensure_control_or_add_prec(loop_entry_ctrl);
-    //phase->set_idom(Node *d, Node *n, uint dom_depth)
-    // phase->set_ctrl(mulv, loop_entry_ctrl);
-    mul0 = phase->igvn().transform(VectorNode::make(op_mul, mulv, phi, VLEN, recurr_bt));
-  } else {
-     mul0 = phi;
-  }
-
-
-
-  Node *mul1;
-  if (n_factor_info != IDENTITY) {
-    mul1 = VectorNode::make(op_mul, c_term, m, VLEN, recurr_bt);
-    phase->igvn().register_new_node_with_optimizer(mul1);
-  } else {
-    mul1 = c_term;
-  }
-
-  Node *add = VectorNode::make(op_reduce, mul0, mul1, VLEN, recurr_bt); //AddVINode(mul0, mul1, TypeVect::make(recurr_bt, VLEN));
-  phase->igvn().register_new_node_with_optimizer(add);
-
-  phi->set_req(2, add);
-
-  Node *reduce = ReductionNode::make(op_reduce, NULL, identity, add, recurr_bt);
-  phase->igvn().register_new_node_with_optimizer(reduce);
-
-  phase->igvn().replace_node(rhs, reduce); // Replace right hand side with reduction.
-
-  int n_doublings = exact_log2(VLEN);
-  while (n_doublings--) {
-    cl->double_unrolled_count();
-  }
-
-  return true;
+  return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
 }
 
 bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
@@ -1266,7 +940,6 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
                     C->method()->get_Method()->name()->as_utf8());
     });
 
-  // phase->ltree_root()->dump();
   bool ok = build_stuff(C, lpt, phase, igvn, cl);
   cl->mark_was_idiom_analyzed();
   if (ok) {

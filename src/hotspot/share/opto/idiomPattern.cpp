@@ -395,7 +395,6 @@ Node *ReductionPattern::generate(PhaseIdealLoop *phase,
 /****************************************************************
  * Dump.
  ****************************************************************/
-
 void ArrayLoadPattern::dump(int indent) {
   print_indent(indent);
   tty->print("ARRAYLOAD[N%d", _access->_index->_idx);
