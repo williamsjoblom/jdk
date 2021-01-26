@@ -4,7 +4,7 @@
 //#include "precompiled.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "opto/node.hpp"
-#include "opto/polynomialReduction.hpp"
+#include "opto/idiomVectorize.hpp"
 #include "opto/idiomPattern.hpp"
 
 /****************************************************************

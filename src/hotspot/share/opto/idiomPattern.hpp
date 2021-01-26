@@ -1,15 +1,11 @@
 #ifndef SHARE_OPTO_IDIOMPATTERN_HPP
 #define SHARE_OPTO_IDIOMPATTERN_HPP
 
-
-//#include "precompiled.hpp"
-#include "polynomialReduction.hpp"
+#include "opto/idiomVectorize.hpp"
 #include "memory/allocation.hpp"
 #include "opto/node.hpp"
 #include "opto/connode.hpp"
 #include "opto/loopnode.hpp"
-//#include "opto/idiomMatch.hpp"
-#include "opto/idiomPattern.hpp"
 
 struct AlignInfo : ResourceObj {
   Node *_base_ptr;
@@ -123,8 +119,8 @@ struct ArrayAccessPattern : PatternInstance {
   virtual AlignInfo *align_info(int vlen) {
     int base_offset = arrayOopDesc::base_offset_in_bytes(velt());
     int bytes_per_iter = type2aelembytes(velt());
-    // NOTE: Ryzen specific, 256 bit loads need only be aligned to 16
-    // bit congruent addresses.
+    // NOTE: AMD Ryzen specific, 256 bit loads need only be aligned to
+    // 16 bit congruent addresses.
     int preferred_align = MIN2(vlen * bytes_per_iter, 16);
     return new AlignInfo(_array_ptr, base_offset,
                          preferred_align,

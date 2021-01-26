@@ -43,7 +43,7 @@
 #include "opto/rootnode.hpp"
 #include "opto/superword.hpp"
 #include "utilities/powerOfTwo.hpp"
-#include "opto/polynomialReduction.hpp"
+#include "opto/idiomVectorize.hpp"
 
 //=============================================================================
 //--------------------------is_cloop_ind_var-----------------------------------
@@ -3232,7 +3232,7 @@ void PhaseIdealLoop::build_and_optimize(LoopOptsMode mode) {
   if (C->has_loops() && mode == LoopOptsDefault) {
     for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
       IdealLoopTree* lpt = iter.current();
-      if (polynomial_reduction_analyze(C, this, &_igvn, lpt)) {
+      if (idiom_analyze(C, this, &_igvn, lpt)) {
         // set_created_loop_node();
         C->set_major_progress();
         // poison_rce_post_loop(lpt);

@@ -779,12 +779,12 @@
   diagnostic(bool, ExpandSubTypeCheckAtParseTime, false,                    \
           "Do not use subtype check macro node")                            \
                                                                             \
-  product(bool, SuperWordPolynomial, false,                                 \
+  product(bool, IdiomVectorize, false,                                 \
           "Use polynomial reduction support in superword")                  \
                                                                             \
-  product(uintx, SuperWordPolynomialWidth, 32,                              \
-          "Target vector with for SuperWordPolynomial")                     \
+  product(uintx, IdiomVectorWidth, 32,                              \
+          "Target vector with for IdiomVectorize")                     \
                                                                             \
-  product(bool, SuperWordPolynomialMultiversion, true,                      \
+  product(bool, IdiomMultiversion, true,                                    \
           "Emit multiversioned loops for idiom vectorized loops")
 #endif // SHARE_OPTO_C2_GLOBALS_HPP

@@ -1,5 +1,5 @@
 #include "precompiled.hpp"
-#include "opto/polynomialReduction.hpp"
+#include "opto/idiomVectorize.hpp"
 #include "opto/loopnode.hpp"
 #include "opto/node.hpp"
 #include "opto/addnode.hpp"
@@ -28,11 +28,6 @@ const int TRACE_OPTS = NoTraceOpts;
 /****************************************************************
  * Minimum matching condition.
  ****************************************************************/
-// bool has_control_flow(CountedLoopNode *cl) {
-//   // TODO: Bad negation?
-//   Node *exit = cl->loopexit();
-//   return exit->in(0) == cl;
-// }
 
 PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory) {
   // Find _the_ phi node connected with a control edge from the given
@@ -71,9 +66,9 @@ PhiNode *find_recurrence_phi(CountedLoopNode *cl, bool memory) {
 }
 
 
-// TODO: most likely too slow to be run on EVERY CountedLoop. We
-// should probably replace the DFS in `find_nodes` with a BFS, reduce
-// `MAX_SEARCH_DEPTH`, or come up with a new solution all together.
+/**
+ * Find right-hand-side of loop body assignment.
+ */
 Node *find_rhs(PhiNode *reduction_phi) {
   return reduction_phi->in(2);
 }
@@ -236,7 +231,7 @@ NFactorInfo find_n_factor(Node *start, Node *of, BasicType recurr_bt, JavaValue 
   return NOT_FOUND;
 }
 
-// Strip eventual conversions, returning the node being converted and
+// Strip any eventual conversions, returning the node being converted and
 // setting `bt` to the resulting type of the conversion.
 Node *strip_conversions(Node *start, BasicType& bt) {
   if (is_binop_f(start)) {
@@ -272,16 +267,16 @@ Node *strip_conversions(Node *start, BasicType& bt) {
  * Pattern instance alignment.
  ****************************************************************/
 
-// struct AlignInfo {
-//   Node *_base_addr;
-//   BasicType _elem_bt;
-// };
-
 // Number of iterations that are to be taken to satisfy alignment constraints.
 // Constant folded down to a `&`, `-`, and `<<`.
+//
+// Computes the following expression:
+//  trips = (target_align - ptr_first_elem%target_align) / elem_size
+//
+// Since `target_align` and `elem_size` are powers of 2 we can do some
+// bit twiddling to not make the computation painfully slow.
 Node *pre_loop_align_limit(PhaseIterGVN &igvn, Node *target_align,
                            Node *ptr_first_elem, int elem_size) {
-  // ptr_first_elem % target_align (assumes `target_align` to be power of 2).
   Node *target_minus1 = igvn.transform(new AddINode(target_align, igvn.intcon(-1)));
   Node *mod = igvn.transform(new AndINode(ptr_first_elem, target_minus1));
   Node *sub = igvn.transform(new SubINode(target_align, mod));
@@ -289,6 +284,7 @@ Node *pre_loop_align_limit(PhaseIterGVN &igvn, Node *target_align,
   return div;
 }
 
+// Change pre-loop tripcount to align vectorized iterations.
 void align_first_main_loop_iters(PhaseIterGVN &igvn, CountedLoopNode *pre_loop, Node *orig_limit,
                                  AlignInfo *align, int vlen) {
   Node *base = align->_base_ptr;
@@ -443,7 +439,7 @@ Node *identity_con(int opc) {
   case Op_MulD:
     return ConNode::make(TypeD::make(1));
   default:
-    // TODO: Reaches here in Tools-Javadoc-Startup
+    // TODO
     ShouldNotReachHere();
     return NULL;
   }
@@ -510,11 +506,14 @@ Node *make_vector(PhaseIdealLoop *phase, JavaValue init, const Type *recurr_t, j
     break;
   default:
     ShouldNotReachHere();
+    return NULL;
   }
 
   return make_vector(phase, init_con, recurr_t, vec_size, control);
 }
 
+// Return long segment indexed by `i` of a constant vector containing
+// increasing expontentials.
 template<typename T>
 jlong exp_vector_part(int i, T n, int elem_bytes) {
   uint64_t mask = (1l << elem_bytes*8) - 1;
@@ -667,10 +666,10 @@ void set_stride(CountedLoopNode *cl, PhaseIdealLoop *phase, jint new_stride) {
 void adjust_limit(CountedLoopNode *cl, PhaseIterGVN &igvn, Node *adjusted_limit) {
   // WARNING: (limit - stride) may underflow.
   // TODO: See `loopTransform.cpp:do_unroll()` for how to patch this up correctly.
-  const uint LIMIT = 2;
+  const uint LIMIT_IN = 2;
   Node *cmp = cl->loopexit()->cmp_node();
   assert(cmp != NULL && cmp->req() == 3, "no loop limit found");
-  igvn.replace_input_of(cmp, LIMIT, adjusted_limit);
+  igvn.replace_input_of(cmp, LIMIT_IN, adjusted_limit);
 }
 
 
@@ -681,37 +680,7 @@ int round_up(int number, int multiple) {
 
 // Return an estimation of the minumum number of trips that has to be
 // taken for the vectorized loop to be profitable.
-int min_profitable_trips(int vlen, BasicType bt,
-                         PatternInstance* pi,
-                         int max_pre_iters) {
-  return 1;
-  float missed_unroll_trip_cost = 2*vlen;
-  float cost = missed_unroll_trip_cost;
-  float ilp_trip_cost = 0;
-
-  if (pi->op() == PatternInstance::Reduction) {
-    ReductionPattern *reduction = static_cast<ReductionPattern*>(pi);
-    if (!reduction->_scaled) {
-      switch (bt) {
-      case T_DOUBLE:
-        return (vlen == 2 ? 11 : 21) + max_pre_iters;
-      case T_FLOAT:
-        return (vlen == 4 ? 12 : 24) + max_pre_iters;
-      case T_INT:
-        return (vlen == 4 ? 40 : 80) + max_pre_iters;
-      default: break;
-      }
-    } else {
-      switch (bt) {
-      case T_INT:
-        return (vlen == 4 ? 12 : 24) + max_pre_iters;
-      case T_BYTE:
-        return 0;
-      default: break;
-      }
-    }
-  }
-
+int min_profitable_trips(int vlen, BasicType bt, PatternInstance* pi, int max_pre_iters) {
   return 2*vlen + max_pre_iters;
 }
 
@@ -767,7 +736,6 @@ struct LoopVariantInfo {
   Node *start;
 };
 
-
 void rewrite_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *cl,
                   PatternInstance *pi, Node *start, const Type* recurr_t, int VLEN,
                   Node *reduction_phi, Node *induction_phi) {
@@ -782,13 +750,34 @@ void rewrite_loop(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *cl
                                      induction_phi, loop_entry_ctrl, old_new,
                                      lpt);
   assert(start_replace != NULL, "no ir generated");
-  //igvn.register_new_node_with_optimizer(start_replace);
   phase->igvn().replace_node(start, start_replace);
   phase->igvn().remove_dead_node(start);
 }
 
-bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *cl, PhaseIterGVN &igvn,
-                   Node *induction_phi, Node *reduction_phi) {
+bool match_and_vectorize(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
+                 PhaseIterGVN *igvn, CountedLoopNode *cl) {
+  const juint VBYTES = IdiomVectorWidth;
+  /**************************************************************
+   * Find induction and reduction phis, and right hand side of
+   * scalar reduction.
+   **************************************************************/
+  Node *induction_phi = cl->phi();
+  if (induction_phi == NULL) return false;
+  TRACE(MinCond, {
+      tty->print_cr("Found induction phi N%d", induction_phi->_idx);
+    });
+
+  // PhiNode holding the current value of the recurrence variable.
+  PhiNode *reduction_phi = find_recurrence_phi(cl, true);
+  if (reduction_phi == NULL) return false;
+  TRACE(MinCond, {
+    tty->print_cr("Found reduction phi N%d", reduction_phi->_idx);
+  });
+
+  /*
+   * return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
+   */
+
 
   Node *start = reduction_phi->in(2);
   PatternInstance* pi = match(start, induction_phi);
@@ -810,7 +799,7 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
 
   const BasicType recurr_bt = pi->velt();
   const Type *recurr_t = Type::get_const_basic_type(recurr_bt);
-  const int VLEN = SuperWordPolynomialWidth / type2aelembytes(recurr_bt);
+  const int VLEN = IdiomVectorWidth / type2aelembytes(recurr_bt);
 
   // Skip vectorization when trip-count is expected to be below profitability.
   int pre_iters = VLEN;
@@ -819,11 +808,11 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
     return false;
   }
   assert(is_power_of_2(VLEN), "santiy");
-  phase->C->set_max_vector_size(SuperWordPolynomialWidth);
+  phase->C->set_max_vector_size(IdiomVectorWidth);
 
   // Apply scalar multiversioning.
   Node *loop_entry_ctrl = cl->in(LoopNode::EntryControl);
-  if (SuperWordPolynomialMultiversion) {
+  if (IdiomMultiversion) {
     loop_entry_ctrl = build_scalar_variant(phase, lpt, cl, recurr_bt, VLEN, pi, pre_iters);
   }
 
@@ -837,7 +826,7 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   // Align vector loop iteration.
   AlignInfo *align_info = pi->align_info(VLEN);
   if (align_info != NULL) {
-    align_first_main_loop_iters(igvn, find_pre_loop(cl), orig_limit,
+    align_first_main_loop_iters(phase->igvn(), find_pre_loop(cl), orig_limit,
                                 align_info, VLEN);
   }
 
@@ -846,12 +835,12 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
                                      lpt);
   assert(start_replace != NULL, "no ir generated");
 
-  igvn.replace_node(start, start_replace);
+  phase->igvn().replace_node(start, start_replace);
 
   lpt->record_for_igvn();
 
   static int total_vectorized_loops = 0;
-  Compile *c = igvn.C;
+  Compile *c = phase->igvn().C;
   Method *m = c->method()->get_Method();
   if (c->_compile_id != m->_n_vectorized_loops_comp_idx) {
     m->_n_vectorized_loops_comp_idx = c->_compile_id;
@@ -879,40 +868,17 @@ bool go_prefix_sum(IdealLoopTree *lpt, PhaseIdealLoop *phase, CountedLoopNode *c
   return true;
 }
 
-
-bool build_stuff(Compile *C, IdealLoopTree *lpt, PhaseIdealLoop *phase,
-                 PhaseIterGVN *igvn, CountedLoopNode *cl) {
-  const juint VBYTES = SuperWordPolynomialWidth;
-  /**************************************************************
-   * Find induction and reduction phis, and right hand side of
-   * scalar reduction.
-   **************************************************************/
-  Node *induction_phi = cl->phi();
-  if (induction_phi == NULL) return false;
-  TRACE(MinCond, {
-      tty->print_cr("Found induction phi N%d", induction_phi->_idx);
-    });
-
-  // PhiNode holding the current value of the recurrence variable.
-  PhiNode *reduction_phi = find_recurrence_phi(cl, true);
-  if (reduction_phi == NULL) return false;
-  TRACE(MinCond, {
-    tty->print_cr("Found reduction phi N%d", reduction_phi->_idx);
-  });
-
-  return go_prefix_sum(lpt, phase, cl, phase->igvn(), induction_phi, reduction_phi);
-}
-
-bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
-  if (!SuperWordPolynomial) return false;
+bool idiom_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt) {
+  if (!IdiomVectorize) return false;
   if (!lpt->is_counted() || !lpt->is_innermost()) return false;
   CountedLoopNode *cl = lpt->_head->as_CountedLoop();
 
   // NOTE: If removing the `is_normal_loop` check, make sure to do
   // this check inside `split_loop`:
-  if (cl->has_passed_idiom_analysis() || cl->is_vectorized_loop() ||
-      !cl->is_normal_loop()) return false;
-  if (cl->is_unroll_only()) return false;
+  if (cl->has_passed_idiom_analysis() ||
+      cl->is_vectorized_loop() ||
+      !cl->is_normal_loop() ||
+      cl->is_unroll_only()) return false;
 
   TRACE(Candidates, {
       tty->print_cr("Initial analysis of %s::%s",
@@ -940,7 +906,7 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
                     C->method()->get_Method()->name()->as_utf8());
     });
 
-  bool ok = build_stuff(C, lpt, phase, igvn, cl);
+  bool ok = match_and_vectorize(C, lpt, phase, igvn, cl);
   cl->mark_was_idiom_analyzed();
   if (ok) {
     TRACE(Success, {
@@ -954,7 +920,7 @@ bool polynomial_reduction_analyze(Compile* C, PhaseIdealLoop *phase, PhaseIterGV
     cl->mark_loop_vectorized();
     cl->mark_passed_slp();
     cl->mark_was_slp();
-    int n_doublings = exact_log2(8);
+    int n_doublings = exact_log2(IdiomVectorWidth);
     while (n_doublings--) {
       cl->double_unrolled_count();
     }

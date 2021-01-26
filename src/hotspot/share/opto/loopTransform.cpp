@@ -40,7 +40,7 @@
 #include "opto/subnode.hpp"
 #include "opto/superword.hpp"
 #include "opto/vectornode.hpp"
-#include "opto/polynomialReduction.hpp"
+#include "opto/idiomVectorize.hpp"
 
 //------------------------------is_loop_exit-----------------------------------
 // Given an IfNode, return the loop-exiting projection or NULL if both
@@ -759,13 +759,13 @@ bool IdealLoopTree::policy_unroll(PhaseIdealLoop *phase) {
 
   // Delay unrolling until the loop has been analyzed for vectorizable
   // idioms.
-  // if (SuperWordPolynomial && !cl->was_idiom_analyzed()) return false;
-  // if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
+  // if (IdiomVectorize && !cl->was_idiom_analyzed()) return false;
+  // if (IdiomVectorize && cl->has_passed_idiom_analysis()) return false;
   // Disable unrolling for loops that has been idiom vectorized.
 
   // TODO: Maybe uncomment these suckers:
-  // if (SuperWordPolynomial && cl->has_passed_idiom_analysis()) return false;
-  // if (SuperWordPolynomial) return false;
+  // if (IdiomVectorize && cl->has_passed_idiom_analysis()) return false;
+  // if (IdiomVectorize) return false;
 
   // {
   //   tty->print_cr("WARNING: unroll disabled!");

@@ -178,35 +178,35 @@ public abstract class VectorIdiom {
     // }
 
     // @Fork(value = 1, jvmArgsPrepend = {
-    //         "-XX:+SuperWordPolynomial",
-    //         "-XX:SuperWordPolynomialWidth=16",
-    //         "-XX:+SuperWordPolynomialAlign"
+    //         "-XX:+IdiomVectorize",
+    //         "-XX:IdiomVectorWidth=16",
+    //         "-XX:+IdiomVectorizeAlign"
     //     })
     // public static class VectorXMMAligned extends VectorIdiom { }
 
     // @Fork(value = 1, jvmArgsPrepend = {
-    //   "-XX:+SuperWordPolynomial",
-    //   "-XX:SuperWordPolynomialWidth=32",
-    //   "-XX:+SuperWordPolynomialAlign"
+    //   "-XX:+IdiomVectorize",
+    //   "-XX:IdiomVectorWidth=32",
+    //   "-XX:+IdiomVectorizeAlign"
     // })
     // public static class VectorYMMAligned extends VectorIdiom { }
 
    @Fork(value = 1, jvmArgsPrepend = {
-            "-XX:+SuperWordPolynomial",
-            "-XX:SuperWordPolynomialWidth=16",
+            "-XX:+IdiomVectorize",
+            "-XX:IdiomVectorWidth=16",
             // "-XX:+UnlockDiagnosticVMOptions",
             // "-XX:+PrintOptoAssembly"
         })
     public static class VectorXMM extends VectorIdiom { }
 
     // @Fork(value = 1, jvmArgsPrepend = {
-    //   "-XX:+SuperWordPolynomial",
-    //   "-XX:SuperWordPolynomialWidth=32"
+    //   "-XX:+IdiomVectorize",
+    //   "-XX:IdiomVectorWidth=32"
     // })
     // public static class VectorYMM extends VectorIdiom { }
 
     @Fork(value = 1, jvmArgsPrepend = {
-        "-XX:-SuperWordPolynomial",
+        "-XX:-IdiomVectorize",
         // "-XX:+UnlockDiagnosticVMOptions",
         // "-XX:+PrintOptoAssembly"
       })

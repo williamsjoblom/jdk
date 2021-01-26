@@ -1,7 +1,7 @@
 #include "opto/idiomPattern.hpp"
 
 #include "precompiled.hpp"
-#include "opto/polynomialReduction.hpp"
+#include "opto/idiomVectorize.hpp"
 #include "opto/node.hpp"
 #include "opto/addnode.hpp"
 #include "opto/memnode.hpp"

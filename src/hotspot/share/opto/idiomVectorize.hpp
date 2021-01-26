@@ -13,6 +13,7 @@ class Type;
 class CountedLoopNode;
 class PhiNode;
 
+// Trace options.
 enum TraceOpts {
   NoTraceOpts = 0,
   MinCond = 1 << 0,
@@ -47,7 +48,7 @@ bool is_associative(int opc);
 bool is_semiassociative(int opc);
 int reduction_opcode(int opc);
 
-bool polynomial_reduction_analyze(Compile *C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt);
+bool idiom_analyze(Compile *C, PhaseIdealLoop *phase, PhaseIterGVN *igvn, IdealLoopTree *lpt);
 
 Node *make_exp_vector(PhaseIdealLoop *phase, JavaValue n, juint vlen, const Type *t,
                       Node *control);
